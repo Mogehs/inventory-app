@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1011682933851",
+    "project_id": "react-native-235c3",
+    "storage_bucket": "react-native-235c3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1011682933851:android:8bca219eb24dccf683d37e",
+        "android_client_info": {
+          "package_name": "com.sk.inventoryapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCIMPvghN1cZM_Eu8XM_TJ1xWKdcTw0_04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

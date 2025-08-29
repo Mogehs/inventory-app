@@ -1,97 +1,204 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Inventory Management App
 
-# Getting Started
+A comprehensive React Native mobile application for inventory management with Firebase backend integration.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Features
 
-## Step 1: Start Metro
+- **User Authentication**: Secure login/register with Firebase Auth
+- **Inventory Management**: Add, edit, delete, and track inventory items
+- **Real-time Database**: Firestore integration for real-time data sync
+- **Stock Monitoring**: Low stock alerts and stock level tracking
+- **Barcode Scanner**: Quick item lookup and management (placeholder)
+- **Reports & Analytics**: Inventory reports and performance insights
+- **Multi-platform**: Runs on both Android and iOS devices
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Tech Stack
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- **Frontend**: React Native with TypeScript
+- **Backend**: Firebase (Authentication, Firestore, Storage)
+- **Navigation**: React Navigation 6
+- **State Management**: React Context API
+- **UI Components**: Custom components with React Native
+- **Icons**: React Native Vector Icons
 
-```sh
-# Using npm
-npm start
+## Prerequisites
 
-# OR using Yarn
-yarn start
+Before running this application, make sure you have:
+
+- Node.js (v16 or higher)
+- npm or yarn
+- React Native development environment set up
+- Android Studio (for Android development)
+- Xcode (for iOS development, macOS only)
+- Firebase project configured
+
+## Installation
+
+1. **Clone the repository** (if from git):
+
+   ```bash
+   git clone <your-repo-url>
+   cd inventory-app
+   ```
+
+2. **Install dependencies**:
+
+   ```bash
+   npm install
+   ```
+
+3. **Configure Firebase**:
+
+   - Follow the instructions in `FIREBASE_SETUP.md`
+   - Add your `google-services.json` (Android) and `GoogleService-Info.plist` (iOS)
+
+4. **Install iOS dependencies** (iOS only):
+   ```bash
+   cd ios && pod install
+   ```
+
+## Running the App
+
+1. **Start Metro bundler**:
+
+   ```bash
+   npm start
+   ```
+
+2. **Run on Android**:
+
+   ```bash
+   npm run android
+   # or
+   npx react-native run-android
+   ```
+
+3. **Run on iOS** (macOS only):
+   ```bash
+   npm run ios
+   # or
+   npx react-native run-ios
+   ```
+
+## Project Structure
+
+```
+src/
+├── config/
+│   └── firebase.ts          # Firebase configuration and helpers
+├── contexts/
+│   └── AuthContext.tsx      # Authentication context
+├── navigation/
+│   └── AppNavigator.tsx     # App navigation setup
+├── screens/
+│   ├── auth/               # Login/Register screens
+│   ├── dashboard/          # Dashboard screen
+│   ├── inventory/          # Inventory management screens
+│   ├── scanner/            # Barcode scanner screen
+│   ├── reports/            # Reports and analytics
+│   └── settings/           # App settings
+├── types/
+│   └── index.ts            # TypeScript type definitions
+└── App.tsx                 # Main app component
 ```
 
-## Step 2: Build and run your app
+## Key Features Explained
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+### Authentication
 
-### Android
+- Email/password authentication with Firebase
+- User registration and login
+- Secure session management
 
-```sh
-# Using npm
-npm run android
+### Inventory Management
 
-# OR using Yarn
-yarn android
-```
+- Add new inventory items with details like SKU, price, quantity
+- Track stock levels with min/max thresholds
+- Location-based inventory tracking
+- Real-time stock updates
 
-### iOS
+### Dashboard
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+- Overview of total items, low stock alerts
+- Quick action buttons for common tasks
+- Real-time statistics display
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+### Reports
 
-```sh
-bundle install
-```
+- Inventory summaries and analytics
+- Stock movement history
+- Performance insights (placeholder for future implementation)
 
-Then, and every time you update your native dependencies, run:
+## Firebase Configuration
 
-```sh
-bundle exec pod install
-```
+The app requires a Firebase project with the following services enabled:
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+1. **Authentication**: Email/Password provider
+2. **Firestore Database**: For storing inventory data
+3. **Storage**: For item images (optional)
 
-```sh
-# Using npm
-npm run ios
+See `FIREBASE_SETUP.md` for detailed setup instructions.
 
-# OR using Yarn
-yarn ios
-```
+## Database Schema
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Collections
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+- `users`: User profiles and settings
+- `inventory`: Inventory items with all details
+- `categories`: Product categories
+- `suppliers`: Supplier information
+- `transactions`: Stock movement history
 
-## Step 3: Modify your app
+## Development
 
-Now that you have successfully run the app, let's make changes!
+### Available Scripts
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+- `npm start`: Start Metro bundler
+- `npm run android`: Run on Android device/emulator
+- `npm run ios`: Run on iOS device/simulator
+- `npm run lint`: Run ESLint
+- `npm test`: Run tests
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+### Code Style
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+The project uses:
 
-## Congratulations! :tada:
+- ESLint for code linting
+- Prettier for code formatting
+- TypeScript for type safety
 
-You've successfully run and modified your React Native App. :partying_face:
+## Contributing
 
-### Now what?
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+## Troubleshooting
 
-# Troubleshooting
+### Common Issues
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+1. **Metro bundler not starting**:
 
-# Learn More
+   - Clear cache: `npx react-native start --reset-cache`
 
-To learn more about React Native, take a look at the following resources:
+2. **Android build issues**:
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+   - Clean build: `cd android && ./gradlew clean`
+
+3. **iOS build issues**:
+
+   - Clean build: `cd ios && xcodebuild clean`
+
+4. **Firebase connection issues**:
+   - Verify configuration files are in correct locations
+   - Check Firebase project settings
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support and questions, please create an issue in the project repository.
