@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../../components/ToastProvider';
 
 const SettingItem = ({
   title,
@@ -26,7 +26,7 @@ const SettingItem = ({
   </TouchableOpacity>
 );
 
-const SettingsScreen = () => {
+const SettingsScreen = ({ navigation }: any) => {
   const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
@@ -104,6 +104,11 @@ const SettingsScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>App</Text>
+        <SettingItem
+          title="How It Works"
+          subtitle="Learn how to use the inventory system"
+          onPress={() => navigation.navigate('HowItWorks')}
+        />
         <SettingItem title="About" subtitle="App version and information" />
         <SettingItem
           title="Help & Support"

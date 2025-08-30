@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getCollection } from '../../config/firebase';
 import { InventoryItem } from '../../types';
 import { LoadingSpinner } from '../../components';
@@ -147,6 +148,17 @@ const InventoryScreen = ({ navigation, route }: any) => {
   useEffect(() => {
     loadInventory();
   }, []);
+
+  // Add focus listener to refresh data when returning from other screens
+  useFocusEffect(
+    useCallback(() => {
+      // Only reload if we're not already loading and have items
+      // This prevents unnecessary reload on first mount
+      if (!loading && items.length > 0) {
+        loadInventory();
+      }
+    }, [loading, items.length]),
+  );
 
   useEffect(() => {
     // Reset to first page when filters change
@@ -617,13 +629,13 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 42,
+    height: 34,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 8,
     paddingHorizontal: 12,
     backgroundColor: '#F9FAFB',
-    fontSize: 15,
+    fontSize: 10,
     color: '#111827',
     marginRight: 8,
     textAlign: 'center',

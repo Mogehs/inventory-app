@@ -15,7 +15,9 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import InventoryScreen from '../screens/inventory/InventoryScreen';
 import AddItemScreen from '../screens/inventory/AddItemScreen';
+import ItemDetailsScreen from '../screens/inventory/ItemDetailsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
+import HowItWorksScreen from '../screens/settings/HowItWorksScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -110,7 +112,7 @@ const MainTabs = () => (
     />
     <Tab.Screen
       name="Settings"
-      component={SettingsScreen}
+      component={SettingsStack}
       options={{
         tabBarLabel: 'Settings',
         tabBarIcon: SettingsTabIcon,
@@ -151,6 +153,69 @@ const InventoryStack = () => (
       component={AddItemScreen}
       options={{
         title: 'Add Item',
+        headerBackTitle: 'Back',
+      }}
+    />
+    <Stack.Screen
+      name="ItemDetails"
+      component={ItemDetailsScreen}
+      options={{
+        title: 'Product Details',
+        headerBackTitle: 'Back',
+        headerStyle: {
+          backgroundColor: '#FFFFFF',
+          shadowColor: '#000',
+          shadowOffset: {
+            width: 0,
+            height: 2,
+          },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 4,
+        },
+        headerTitleStyle: {
+          fontSize: 18,
+          fontWeight: '700',
+          color: '#1F2937',
+        },
+        headerTintColor: '#2563EB',
+      }}
+    />
+  </Stack.Navigator>
+);
+
+const SettingsStack = () => (
+  <Stack.Navigator
+    screenOptions={{
+      headerStyle: {
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
+      },
+      headerTitleStyle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+      },
+      headerTintColor: '#2563EB',
+    }}
+  >
+    <Stack.Screen
+      name="SettingsList"
+      component={SettingsScreen}
+      options={{ title: 'Settings' }}
+    />
+    <Stack.Screen
+      name="HowItWorks"
+      component={HowItWorksScreen}
+      options={{
+        title: 'How It Works',
         headerBackTitle: 'Back',
       }}
     />
