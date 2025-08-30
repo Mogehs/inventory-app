@@ -2,84 +2,136 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 
 interface IconProps {
+  focused?: boolean;
   size?: number;
   color?: string;
 }
 
-export const EyeIcon: React.FC<IconProps> = ({
-  size = 20,
+export const DashboardIcon: React.FC<IconProps> = ({
+  focused,
+  size = 24,
   color = '#6B7280',
-}) => (
-  <View style={[styles.icon, { width: size, height: size }]}>
-    <View style={[styles.eyeOuter, { borderColor: color }]}>
-      <View style={[styles.eyeInner, { backgroundColor: color }]} />
-    </View>
-  </View>
-);
+}) => {
+  const gridOpacity = focused ? 1 : 0.6;
 
-export const EyeOffIcon: React.FC<IconProps> = ({
-  size = 20,
-  color = '#6B7280',
-}) => (
-  <View style={[styles.icon, { width: size, height: size }]}>
-    <View style={[styles.eyeOuter, { borderColor: color }]}>
-      <View style={[styles.eyeInner, { backgroundColor: color }]} />
+  return (
+    <View style={[styles.iconContainer, { width: size, height: size }]}>
+      <View style={[styles.dashboardIcon, { borderColor: color }]}>
+        <View style={[styles.dashboardGrid, { backgroundColor: color }]} />
+        <View
+          style={[
+            styles.dashboardGrid,
+            {
+              backgroundColor: color,
+              opacity: gridOpacity,
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.dashboardGrid,
+            {
+              backgroundColor: color,
+              opacity: gridOpacity,
+            },
+          ]}
+        />
+        <View style={[styles.dashboardGrid, { backgroundColor: color }]} />
+      </View>
     </View>
-    <View style={[styles.eyeSlash, { backgroundColor: color }]} />
-  </View>
-);
+  );
+};
 
 export const InventoryIcon: React.FC<IconProps> = ({
-  size = 40,
-  color = '#3B82F6',
+  focused,
+  size = 24,
+  color = '#6B7280',
+}) => {
+  const boxBackground = focused ? color : 'transparent';
+  const handleBackground = focused ? '#FFFFFF' : color;
+
+  return (
+    <View style={[styles.iconContainer, { width: size, height: size }]}>
+      <View
+        style={[
+          styles.inventoryBox,
+          {
+            borderColor: color,
+            backgroundColor: boxBackground,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.inventoryHandle,
+            {
+              backgroundColor: handleBackground,
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
+};
+
+export const SettingsIcon: React.FC<IconProps> = ({
+  size = 24,
+  color = '#6B7280',
 }) => (
-  <View style={[styles.inventoryIcon, { width: size, height: size }]}>
-    <View style={[styles.inventoryBox, { borderColor: color }]}>
-      <View style={[styles.inventoryHandle, { backgroundColor: color }]} />
+  <View style={[styles.iconContainer, { width: size, height: size }]}>
+    <View style={[styles.settingsIcon, { borderColor: color }]}>
+      <View style={[styles.settingsCenter, { backgroundColor: color }]} />
     </View>
   </View>
 );
 
 const styles = StyleSheet.create({
-  icon: {
+  iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  eyeOuter: {
-    width: '80%',
-    height: '60%',
+  dashboardIcon: {
+    width: '90%',
+    height: '90%',
     borderWidth: 1.5,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 3,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 2,
+    justifyContent: 'space-between',
+    alignContent: 'space-between',
   },
-  eyeInner: {
-    width: '40%',
-    height: '60%',
-    borderRadius: 10,
-  },
-  eyeSlash: {
-    position: 'absolute',
-    width: '120%',
-    height: 1.5,
-    transform: [{ rotate: '45deg' }],
-  },
-  inventoryIcon: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  dashboardGrid: {
+    width: '45%',
+    height: '45%',
+    borderRadius: 1,
   },
   inventoryBox: {
-    width: '80%',
+    width: '85%',
     height: '70%',
-    borderWidth: 2,
-    borderRadius: 4,
+    borderWidth: 1.5,
+    borderRadius: 2,
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingTop: '10%',
   },
   inventoryHandle: {
-    width: '60%',
-    height: '15%',
-    borderRadius: 2,
+    width: '40%',
+    height: 2,
+    borderRadius: 1,
+  },
+  settingsIcon: {
+    width: '85%',
+    height: '85%',
+    borderWidth: 1.5,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  settingsCenter: {
+    width: '35%',
+    height: '35%',
+    borderRadius: 50,
   },
 });

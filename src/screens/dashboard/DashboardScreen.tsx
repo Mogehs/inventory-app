@@ -96,13 +96,13 @@ const DashboardScreen = ({ navigation }: any) => {
         <StatCard
           title="Total Items"
           value={stats.totalItems}
-          color="#007AFF"
+          color="#2563EB"
           onPress={() => navigation.navigate('Inventory')}
         />
         <StatCard
           title="Low Stock"
           value={stats.lowStock}
-          color="#FF9500"
+          color="#D97706"
           onPress={() =>
             navigation.navigate('Inventory', { filter: 'lowStock' })
           }
@@ -110,7 +110,7 @@ const DashboardScreen = ({ navigation }: any) => {
         <StatCard
           title="Out of Stock"
           value={stats.outOfStock}
-          color="#FF3B30"
+          color="#DC2626"
           onPress={() =>
             navigation.navigate('Inventory', { filter: 'outOfStock' })
           }
@@ -118,8 +118,7 @@ const DashboardScreen = ({ navigation }: any) => {
         <StatCard
           title="Total Value"
           value={`$${stats.totalValue.toFixed(2)}`}
-          color="#34C759"
-          onPress={() => navigation.navigate('Reports')}
+          color="#059669"
         />
       </View>
 
@@ -130,14 +129,14 @@ const DashboardScreen = ({ navigation }: any) => {
         onPress={() => navigation.navigate('Inventory', { screen: 'AddItem' })}
       />
       <QuickAction
-        title="Scan Barcode"
-        description="Quickly scan items for check-in/out"
-        onPress={() => navigation.navigate('Scanner')}
+        title="View Inventory"
+        description="Browse and manage your inventory items"
+        onPress={() => navigation.navigate('Inventory')}
       />
       <QuickAction
-        title="View Reports"
-        description="Analyze your inventory performance"
-        onPress={() => navigation.navigate('Reports')}
+        title="Settings"
+        description="Manage your account and app preferences"
+        onPress={() => navigation.navigate('Settings')}
       />
     </ScrollView>
   );
@@ -146,95 +145,117 @@ const DashboardScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FAFAFA',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: 'white',
-    marginBottom: 20,
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   greeting: {
     fontSize: 16,
-    color: '#666',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   username: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 4,
   },
   logoutButton: {
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#DC2626',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   logoutText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontWeight: '600',
+    fontSize: 15,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginHorizontal: 20,
-    marginBottom: 16,
-    color: '#1a1a1a',
+    fontSize: 22,
+    fontWeight: '700',
+    marginHorizontal: 24,
+    marginBottom: 20,
+    color: '#1F2937',
+    letterSpacing: -0.3,
   },
   statsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
+    paddingHorizontal: 24,
+    marginBottom: 40,
   },
   statCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 16,
     borderLeftWidth: 4,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   statTitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontWeight: '500',
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   actionCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    borderRadius: 16,
+    marginHorizontal: 24,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   actionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    color: '#1F2937',
+    marginBottom: 6,
   },
   actionDescription: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 15,
+    color: '#6B7280',
+    lineHeight: 20,
   },
 });
 

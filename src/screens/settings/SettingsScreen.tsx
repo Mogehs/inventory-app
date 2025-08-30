@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../components/ToastProvider';
 
 const SettingItem = ({
   title,
