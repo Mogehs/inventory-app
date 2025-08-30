@@ -12,7 +12,7 @@ export interface InventoryItem {
   name: string;
   description: string;
   sku: string;
-  categoryId: string;
+  category: string;
   supplierId: string;
   quantity: number;
   minStockLevel: number;
