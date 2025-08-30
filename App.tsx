@@ -8,11 +8,14 @@
 import React from 'react';
 import { AuthProvider } from './src/contexts/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import { ToastProvider } from './src/components';
 
 const App = () => {
   return (
     <AuthProvider>
-      <AppNavigator />
+      <ToastProvider>
+        <AppNavigator />
+      </ToastProvider>
     </AuthProvider>
   );
 };
