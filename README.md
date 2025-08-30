@@ -52,7 +52,12 @@ Before running this application, make sure you have:
    - Follow the instructions in `FIREBASE_SETUP.md`
    - Add your `google-services.json` (Android) and `GoogleService-Info.plist` (iOS)
 
-4. **Install iOS dependencies** (iOS only):
+4. **Configure Cloudinary** (for image upload):
+
+   - Follow the instructions in `CLOUDINARY_SETUP.md`
+   - Update your Cloudinary credentials in `src/utils/cloudinary.ts`
+
+5. **Install iOS dependencies** (iOS only):
    ```bash
    cd ios && pod install
    ```
@@ -102,32 +107,38 @@ src/
 └── App.tsx                 # Main app component
 ```
 
-## Key Features Explained
+## Key Features Implemented
 
-### Authentication
+- ✅ User Authentication (Login/Register)
+- ✅ Dashboard with inventory overview
+- ✅ Professional Add Item screen with image upload
+- ✅ Camera and gallery image selection
+- ✅ Cloudinary image optimization and storage
+- ✅ Comprehensive form validation with error handling
+- ✅ Real-time data synchronization
+- ✅ Stock level monitoring
+- ✅ Professional navigation with custom icons
+- ✅ Settings and configuration screens
+- ✅ Reports and analytics screens
+- ✅ TypeScript implementation
+- ✅ Firebase integration ready
 
-- Email/password authentication with Firebase
-- User registration and login
-- Secure session management
+## Latest Updates
 
-### Inventory Management
+### Enhanced Add Item Screen
 
-- Add new inventory items with details like SKU, price, quantity
-- Track stock levels with min/max thresholds
-- Location-based inventory tracking
-- Real-time stock updates
+- 📸 **Image Upload**: Take photos or select from gallery
+- ☁️ **Cloudinary Integration**: Automatic image optimization and cloud storage
+- ✅ **Advanced Validation**: Comprehensive form validation with user-friendly error messages
+- 🎨 **Professional Design**: Elegant UI matching the app's theme
+- 🔧 **Smart Features**: Auto-generated SKU, price calculations, and stock tracking
 
-### Dashboard
+### Professional UI Components
 
-- Overview of total items, low stock alerts
-- Quick action buttons for common tasks
-- Real-time statistics display
-
-### Reports
-
-- Inventory summaries and analytics
-- Stock movement history
-- Performance insights (placeholder for future implementation)
+- 🎯 **Custom Icons**: Professional React Native component-based icons
+- 📱 **Responsive Design**: Works perfectly on all screen sizes
+- 🎨 **Consistent Theme**: Unified color scheme and typography
+- ⚡ **Performance Optimized**: Lightweight and fast loading
 
 ## Firebase Configuration
 
