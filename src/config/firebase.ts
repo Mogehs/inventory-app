@@ -19,6 +19,11 @@ export const COLLECTIONS = {
 // Firestore helpers
 export const createDocument = async (collection: string, data: any) => {
   try {
+    // Ensure user is authenticated before attempting writes
+    if (!authService.currentUser) {
+      console.error('createDocument: unauthenticated request');
+      return { success: false, error: 'unauthenticated' };
+    }
     const docRef = await db.collection(collection).add(data);
     return { success: true, id: docRef.id };
   } catch (error) {
@@ -33,16 +38,43 @@ export const updateDocument = async (
   data: any,
 ) => {
   try {
+    // Debug: log current auth user to help diagnose permission issues
+    try {
+      const uid = authService.currentUser ? authService.currentUser.uid : null;
+      console.debug(
+        `updateDocument: collection=${collection} id=${id} authUid=${uid}`,
+      );
+    } catch (e) {
+      console.debug(
+        'updateDocument: unable to read authService.currentUser',
+        e,
+      );
+    }
+    if (!authService.currentUser) {
+      console.error('updateDocument: unauthenticated request');
+      return { success: false, error: 'unauthenticated' };
+    }
     await db.collection(collection).doc(id).update(data);
     return { success: true };
   } catch (error) {
-    console.error('Error updating document:', error);
+    // Provide more context for permission errors
+    console.error('Error updating document:', {
+      collection,
+      id,
+      data,
+      error,
+      authUid: authService.currentUser ? authService.currentUser.uid : null,
+    });
     return { success: false, error };
   }
 };
 
 export const deleteDocument = async (collection: string, id: string) => {
   try {
+    if (!authService.currentUser) {
+      console.error('deleteDocument: unauthenticated request');
+      return { success: false, error: 'unauthenticated' };
+    }
     await db.collection(collection).doc(id).delete();
     return { success: true };
   } catch (error) {

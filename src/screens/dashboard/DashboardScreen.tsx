@@ -1,13 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  RefreshControl,
 } from 'react-native';
+import firestore from '@react-native-firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
-import { getCollection } from '../../config/firebase';
+import { getCollection, updateDocument } from '../../config/firebase';
+import { useToast } from '../../components/ToastProvider';
 
 const StatCard = ({ title, value, subtitle, color, onPress }: any) => (
   <TouchableOpacity
@@ -22,6 +28,7 @@ const StatCard = ({ title, value, subtitle, color, onPress }: any) => (
 
 const DashboardScreen = ({ navigation }: any) => {
   const { user, signOut } = useAuth();
+  const toast = useToast();
   const [stats, setStats] = useState({
     totalItems: 0,
     lowStock: 0,
@@ -32,9 +39,10 @@ const DashboardScreen = ({ navigation }: any) => {
     totalUnpaid: 0,
   });
   const [_loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [supplierList, setSupplierList] = useState<
-    { name: string; amount: number }[]
+    { name: string; totalCost: number; paid: number; due: number }[]
   >([]);
   const [customerList, setCustomerList] = useState<
     { name: string; amount: number }[]
@@ -42,18 +50,27 @@ const DashboardScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'suppliers' | 'customers'>(
     'suppliers',
   );
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentModalType, setPaymentModalType] = useState<
+    'supplier' | 'customer' | null
+  >(null);
+  const [paymentModalName, setPaymentModalName] = useState<string>('');
+  const [paymentModalDue, setPaymentModalDue] = useState<number>(0);
+  const [paymentAmountInput, setPaymentAmountInput] = useState<string>('');
+  const [_processingPayment, setProcessingPayment] = useState(false);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  // Load dashboard data (hoisted function so effects can call it)
+  async function loadDashboardData(showRefreshing = false) {
     try {
+      if (showRefreshing) setRefreshing(true);
+      else setLoading(true);
+
       // Inventory aggregations
       const inventoryResult = await getCollection('inventory');
       const inventory =
         inventoryResult.success && inventoryResult.data
-          ? inventoryResult.data
+          ? (inventoryResult.data as any[])
           : [];
 
       const totalItems = inventory.length;
@@ -70,26 +87,34 @@ const DashboardScreen = ({ navigation }: any) => {
         return sum + q * p;
       }, 0);
 
-      // Supplier dues aggregation
-      const supplierTotals: Record<string, number> = {};
+      // Supplier aggregation: total cost, total paid, due
+      const supplierTotals: Record<
+        string,
+        { totalCost: number; paid: number; due: number }
+      > = {};
       inventory.forEach((item: any) => {
         const supplier = item.supplier ? String(item.supplier) : 'Unknown';
-        const supplierPaid = Number(item.supplierPaid || 0);
-        const supplierTotalCost = Number(
-          item.supplierTotalCost ||
-            Number(item.unitCost || 0) * Number(item.quantity || 0),
+        const paid = Number((item as any).supplierPaid || 0);
+        const totalCost = Number(
+          (item as any).supplierTotalCost ||
+            Number((item as any).unitCost || 0) *
+              Number((item as any).quantity || 0),
         );
-        const rawDue = supplierTotalCost - supplierPaid;
+        const rawDue = totalCost - paid;
         const due = rawDue > 0 ? rawDue : 0;
-        if (due > 0) {
-          supplierTotals[supplier] = (supplierTotals[supplier] || 0) + due;
-        }
+        if (!supplierTotals[supplier])
+          supplierTotals[supplier] = { totalCost: 0, paid: 0, due: 0 };
+        supplierTotals[supplier].totalCost += totalCost;
+        supplierTotals[supplier].paid += paid;
+        supplierTotals[supplier].due += due;
       });
 
       // Sales aggregations
       const salesResult = await getCollection('sales');
       const sales =
-        salesResult.success && salesResult.data ? salesResult.data : [];
+        salesResult.success && salesResult.data
+          ? (salesResult.data as any[])
+          : [];
       const totalSales = sales.length;
       const totalRevenue = sales.reduce(
         (sum: number, s: any) => sum + Number(s.totalPrice || 0),
@@ -128,9 +153,11 @@ const DashboardScreen = ({ navigation }: any) => {
       });
 
       setSupplierList(
-        Object.entries(supplierTotals).map(([name, amount]) => ({
+        Object.entries(supplierTotals).map(([name, v]) => ({
           name,
-          amount,
+          totalCost: v.totalCost || 0,
+          paid: v.paid || 0,
+          due: v.due || 0,
         })),
       );
       setCustomerList(
@@ -143,6 +170,238 @@ const DashboardScreen = ({ navigation }: any) => {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  // Reload fresh data every time this screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboardData();
+    }, []),
+  );
+
+  const openSupplierModal = (s: {
+    name: string;
+    totalCost: number;
+    paid: number;
+    due: number;
+  }) => {
+    setPaymentModalType('supplier');
+    setPaymentModalName(s.name);
+    setPaymentModalDue(Number(s.due || 0));
+    setPaymentAmountInput('');
+    setPaymentModalVisible(true);
+  };
+
+  const openCustomerModal = (c: { name: string; amount: number }) => {
+    setPaymentModalType('customer');
+    setPaymentModalName(c.name);
+    setPaymentModalDue(Number(c.amount || 0));
+    setPaymentAmountInput('');
+    setPaymentModalVisible(true);
+  };
+
+  const parseAmount = (v: string) => {
+    const cleaned = String(v).replace(/[^0-9.-]+/g, '');
+    const n = Number(cleaned);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const formattedInput = (v: string) => {
+    const n = parseAmount(v);
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'PKR',
+        minimumFractionDigits: 0,
+      }).format(n || 0);
+    } catch (e) {
+      return `PKR ${n}`;
+    }
+  };
+
+  const processSupplierPayment = async () => {
+    const amount = parseAmount(paymentAmountInput);
+    if (amount <= 0) {
+      toast.showToast('Enter a payment greater than 0', 'warning');
+      return;
+    }
+    // Ensure user is authenticated
+    if (!user) {
+      toast.showToast('Please sign in to record payments.', 'error');
+      return;
+    }
+
+    setProcessingPayment(true);
+    try {
+      // fetch all inventory for this supplier
+      const inventoryResult = await getCollection('inventory');
+      const items =
+        inventoryResult.success && inventoryResult.data
+          ? (inventoryResult.data as any[])
+          : [];
+      const supplierItems = items.filter(
+        (it: any) => (it.supplier || 'Unknown') === paymentModalName,
+      );
+
+      let remaining = amount;
+      // sort by createdAt if available (oldest first)
+      supplierItems.sort((a: any, b: any) => {
+        const ta = a.createdAt && a.createdAt.seconds ? a.createdAt.seconds : 0;
+        const tb = b.createdAt && b.createdAt.seconds ? b.createdAt.seconds : 0;
+        return ta - tb;
+      });
+
+      for (const item of supplierItems) {
+        if (remaining <= 0) break;
+        const totalCost = Number(
+          item.supplierTotalCost ||
+            Number(item.unitCost || 0) * Number(item.quantity || 0),
+        );
+        const paid = Number(item.supplierPaid || 0);
+        const due = Math.max(0, totalCost - paid);
+        if (due <= 0) continue;
+        const apply = Math.min(due, remaining);
+        const newPaid = paid + apply;
+        // update document
+        const res = await updateDocument('inventory', item.id, {
+          supplierPaid: newPaid,
+        });
+        if (!res.success) {
+          // show error and stop further updates
+          toast.showToast(
+            'Failed to update inventory item. Check permissions.',
+            'error',
+          );
+          break;
+        }
+        remaining -= apply;
+      }
+
+      setPaymentModalVisible(false);
+      // refresh data to reflect changes
+      await loadDashboardData();
+      toast.showToast(
+        `Recorded payment of ${formatPKR(
+          amount - remaining,
+        )} to ${paymentModalName}`,
+        'success',
+      );
+    } catch (error) {
+      console.error('Supplier payment error:', error);
+      toast.showToast('Failed to process supplier payment', 'error');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const processCustomerPayment = async () => {
+    const amount = parseAmount(paymentAmountInput);
+    if (amount <= 0) {
+      toast.showToast('Enter a payment greater than 0', 'warning');
+      return;
+    }
+    // Ensure user is authenticated
+    if (!user) {
+      toast.showToast('Please sign in to record payments.', 'error');
+      return;
+    }
+
+    setProcessingPayment(true);
+    try {
+      // fetch sales for this customer
+      const salesResult = await getCollection('sales');
+      const sales =
+        salesResult.success && salesResult.data
+          ? (salesResult.data as any[])
+          : [];
+      let custSales = sales.filter(
+        (s: any) => (s.customer || 'Unknown') === paymentModalName,
+      );
+      // compute remaining per sale
+      custSales = custSales
+        .map((s: any) => ({
+          ...s,
+          remaining: Math.max(
+            0,
+            Number(
+              s.remainingAmount ??
+                Number(s.totalPrice || 0) -
+                  Number(
+                    s.paidAmount ||
+                      Number(s.paidCash || 0) + Number(s.paidOnline || 0),
+                  ),
+            ),
+          ),
+        }))
+        .filter((s: any) => s.remaining > 0);
+
+      // sort by createdAt asc
+      custSales.sort((a: any, b: any) => {
+        const ta = a.createdAt && a.createdAt.seconds ? a.createdAt.seconds : 0;
+        const tb = b.createdAt && b.createdAt.seconds ? b.createdAt.seconds : 0;
+        return ta - tb;
+      });
+
+      let remaining = amount;
+      let updated = 0;
+      let skipped = 0;
+      for (const sale of custSales) {
+        if (remaining <= 0) break;
+        // skip sales not owned by current user to avoid permission-denied
+        // Sales documents store the creator in `createdBy` (see SalesScreen.handleAddSale)
+        if (sale.createdBy && sale.createdBy !== user?.uid) {
+          skipped++;
+          continue;
+        }
+        const rem = (sale as any).remaining;
+        const apply = Math.min(rem, remaining);
+        const newPaid = Number((sale as any).paidAmount || 0) + apply;
+        const newRemaining = Math.max(
+          0,
+          Number((sale as any).totalPrice || 0) - newPaid,
+        );
+        const newStatus =
+          newRemaining <= 0 ? 'completed' : newPaid > 0 ? 'partial' : 'pending';
+        const res = await updateDocument('sales', sale.id, {
+          paidAmount: newPaid,
+          remainingAmount: newRemaining,
+          status: newStatus,
+          updatedAt: firestore.Timestamp.now(),
+        });
+        if (!res.success) {
+          toast.showToast(
+            'Failed to update a sale. Check permissions.',
+            'error',
+          );
+          break;
+        }
+        updated++;
+        remaining -= apply;
+      }
+
+      setPaymentModalVisible(false);
+      await loadDashboardData();
+      if (updated > 0)
+        toast.showToast(
+          `Recorded ${formatPKR(amount - remaining)} from ${paymentModalName}`,
+          'success',
+        );
+      if (skipped > 0)
+        toast.showToast(
+          `${skipped} sale(s) skipped (not owned by you)`,
+          'info',
+        );
+    } catch (error) {
+      console.error('Customer payment error:', error);
+      toast.showToast('Failed to process customer payment', 'error');
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -167,11 +426,21 @@ const DashboardScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => loadDashboardData(true)}
+          colors={['#3B82F6']}
+          tintColor="#3B82F6"
+        />
+      }
+    >
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Welcome back,</Text>
+          <Text style={styles.greeting}>Welcome,</Text>
           <Text style={styles.username}>{user?.displayName || 'User'}</Text>
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -179,8 +448,7 @@ const DashboardScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      {/* Stats */}
-      <Text style={styles.sectionTitle}>Overview</Text>
+      {/* Stats (compact boxes only) */}
       <View style={styles.statsGrid}>
         <StatCard
           title="Total Items"
@@ -254,50 +522,151 @@ const DashboardScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
+      {/* Search bar for filtering suppliers/customers */}
+      <View style={styles.searchWrapper}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder={'Search by name...'}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          placeholderTextColor="#9CA3AF"
+        />
+        {searchQuery ? (
+          <TouchableOpacity
+            style={styles.searchClear}
+            onPress={() => setSearchQuery('')}
+            accessibilityLabel="Clear search"
+          >
+            <Text style={styles.searchClearText}>×</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
       {/* Balances */}
       <View style={styles.listWrapper}>
         {activeTab === 'suppliers' && supplierList.length > 0 && (
-          <View style={styles.listBox}>
-            {supplierList.map(s => (
-              <View key={s.name} style={styles.listRow}>
-                <View>
-                  <Text style={styles.listRowTitle}>{s.name}</Text>
-                  <Text style={styles.listRowLabel}>Due</Text>
-                </View>
-                <Text
-                  style={[
-                    styles.listRowAmount,
-                    s.amount > 0 ? styles.dueColor : styles.settledColor,
-                  ]}
+          <View style={styles.listBoxCompact}>
+            {supplierList
+              .filter(s =>
+                s.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+              )
+              .map(s => (
+                <TouchableOpacity
+                  key={s.name}
+                  style={styles.listRowCompact}
+                  onPress={() => openSupplierModal(s)}
                 >
-                  {formatPKR(s.amount)}
-                </Text>
-              </View>
-            ))}
+                  <View style={styles.listRowContent}>
+                    <Text style={styles.listRowTitleCompact}>{s.name}</Text>
+                    <Text style={styles.smallRowMeta}>
+                      Total {formatPKR(s.totalCost)} · Paid {formatPKR(s.paid)}
+                    </Text>
+                  </View>
+                  <View style={styles.listRowRight}>
+                    <Text style={styles.listRowLabelCompact}>Due</Text>
+                    <Text
+                      style={[
+                        styles.listRowAmountCompact,
+                        s.due > 0 ? styles.dueColor : styles.settledColor,
+                      ]}
+                    >
+                      {formatPKR(s.due)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
           </View>
         )}
 
         {activeTab === 'customers' && customerList.length > 0 && (
-          <View style={styles.listBox}>
-            {customerList.map(c => (
-              <View key={c.name} style={styles.listRow}>
-                <View>
-                  <Text style={styles.listRowTitle}>{c.name}</Text>
-                  <Text style={styles.listRowLabel}>Owed</Text>
-                </View>
-                <Text
-                  style={[
-                    styles.listRowAmount,
-                    c.amount > 0 ? styles.owedColor : styles.settledColor,
-                  ]}
+          <View style={styles.listBoxCompact}>
+            {customerList
+              .filter(c =>
+                c.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+              )
+              .map(c => (
+                <TouchableOpacity
+                  key={c.name}
+                  style={styles.listRowCompact}
+                  onPress={() => openCustomerModal(c)}
                 >
-                  {formatPKR(c.amount)}
-                </Text>
-              </View>
-            ))}
+                  <View style={styles.listRowContent}>
+                    <Text style={styles.listRowTitleCompact}>{c.name}</Text>
+                    <Text style={styles.smallRowMeta}>Outstanding</Text>
+                  </View>
+                  <View style={styles.listRowRight}>
+                    <Text style={styles.listRowLabelCompact}>Owed</Text>
+                    <Text
+                      style={[
+                        styles.listRowAmountCompact,
+                        c.amount > 0 ? styles.owedColor : styles.settledColor,
+                      ]}
+                    >
+                      {formatPKR(c.amount)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
           </View>
         )}
       </View>
+      {/* Payment Modal */}
+      <Modal visible={paymentModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>
+              {paymentModalType === 'supplier'
+                ? 'Record Supplier Payment'
+                : 'Record Customer Payment'}
+            </Text>
+            <Text style={styles.modalSubtitle}>{paymentModalName}</Text>
+            <Text style={styles.modalDue}>
+              Remaining: {formatPKR(paymentModalDue)}
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder={formattedInput(paymentAmountInput) || 'Amount'}
+              value={paymentAmountInput}
+              onChangeText={setPaymentAmountInput}
+              keyboardType="numeric"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[
+                  _processingPayment
+                    ? styles.modalBtnDisabled
+                    : styles.modalBtn,
+                  styles.modalCancel,
+                ]}
+                onPress={() => setPaymentModalVisible(false)}
+                disabled={_processingPayment}
+              >
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  _processingPayment
+                    ? styles.modalBtnDisabled
+                    : styles.modalBtn,
+                  styles.modalConfirm,
+                ]}
+                onPress={() =>
+                  paymentModalType === 'supplier'
+                    ? processSupplierPayment()
+                    : processCustomerPayment()
+                }
+                disabled={_processingPayment}
+              >
+                <Text style={styles.modalBtnTextLight}>
+                  {_processingPayment ? 'Processing...' : 'Apply'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -311,81 +680,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
-    marginBottom: 24,
-    elevation: 4,
+    marginBottom: 12,
+    elevation: 2,
   },
   greeting: {
-    fontSize: 16,
+    fontSize: 12,
     color: '#6B7280',
     fontWeight: '500',
   },
   username: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
-    marginTop: 4,
+    marginTop: 2,
   },
   logoutButton: {
     backgroundColor: '#DC2626',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    elevation: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    elevation: 2,
   },
   logoutText: {
     color: '#FFFFFF',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 12,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
-    marginHorizontal: 24,
-    marginBottom: 20,
+    marginHorizontal: 12,
+    marginBottom: 12,
     color: '#1F2937',
   },
   statsGrid: {
-    paddingHorizontal: 24,
-    marginBottom: 18,
+    paddingHorizontal: 8,
+    marginBottom: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 6,
   },
   statSubtitle: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#6B7280',
-    marginTop: 6,
+    marginTop: 4,
     fontWeight: '600',
   },
   statCard: {
     backgroundColor: '#FFFFFF',
-    padding: 24,
-    borderRadius: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    elevation: 4,
-    flex: 1,
-    minWidth: '45%',
-  },
-  statTitle: {
-    fontSize: 15,
-    color: '#6B7280',
+    padding: 10,
+    borderRadius: 12,
     marginBottom: 8,
-    fontWeight: '500',
+    borderLeftWidth: 4,
+    elevation: 2,
+    flex: 1,
+    minWidth: '30%',
+    minHeight: 64,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  // ... compact stat card styles (no icon)
+  statTitle: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 2,
+    fontWeight: '600',
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
   },
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: 24,
-    marginBottom: 12,
-    borderRadius: 8,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 6,
     backgroundColor: '#F3F4F6',
   },
   tab: {
@@ -407,36 +783,69 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   listWrapper: {
-    paddingHorizontal: 24,
-    marginBottom: 40,
+    paddingHorizontal: 12,
+    marginBottom: 24,
   },
   listBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    elevation: 2,
+    borderRadius: 8,
+    padding: 8,
+    elevation: 1,
+  },
+  listBoxCompact: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 6,
+    elevation: 1,
   },
   listRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  listRowTitle: {
-    fontSize: 14,
-    color: '#0F172A',
-    fontWeight: '600',
+  listRowCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  listRowAmount: {
-    fontSize: 14,
+  listRowContent: {
+    flex: 1,
+  },
+  listRowRight: {
+    alignItems: 'flex-end',
+  },
+  listRowTitle: {
+    fontSize: 13,
+    color: '#0F172A',
     fontWeight: '700',
   },
-  listRowLabel: {
+  listRowAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  listRowTitleCompact: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  smallRowMeta: {
     fontSize: 12,
     color: '#6B7280',
-    fontWeight: '600',
     marginTop: 2,
+  },
+  listRowLabelCompact: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '700',
+  },
+  listRowAmountCompact: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   dueColor: {
     color: '#DC2626',
@@ -445,6 +854,112 @@ const styles = StyleSheet.create({
     color: '#059669',
   },
   settledColor: {
+    color: '#6B7280',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalBox: {
+    width: '100%',
+    maxWidth: 520,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  modalDue: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 12,
+    fontSize: 14,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+    gap: 8,
+  },
+  modalBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalBtnDisabled: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    opacity: 0.6,
+  },
+  modalCancel: {
+    backgroundColor: '#F3F4F6',
+  },
+  modalConfirm: {
+    backgroundColor: '#059669',
+  },
+  modalBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalBtnTextLight: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // Search bar
+  searchWrapper: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 14,
+  },
+  searchClear: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  searchClearText: {
+    fontSize: 20,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
     color: '#6B7280',
   },
 });

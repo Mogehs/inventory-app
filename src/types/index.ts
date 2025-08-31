@@ -95,6 +95,8 @@ export interface Sale {
   createdAt: any; // Firestore timestamp
   // Audit fields
   createdBy?: string | null;
+  userId?: string | null; // compatibility with rules expecting userId
+  updatedAt?: any;
   createdByName?: string | null;
   authorizedBy?: string | null;
   productName?: string;

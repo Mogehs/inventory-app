@@ -1,4 +1,5 @@
 import firestore, { collection } from '@react-native-firebase/firestore';
+import { authService } from '../config/firebase';
 
 export interface SaleData {
   itemId?: string | null;
@@ -15,6 +16,13 @@ export interface SaleData {
   paidAmount: number;
   remainingAmount: number;
   createdAt: any;
+  // Audit / ownership fields
+  createdBy?: string | null;
+  userId?: string | null; // duplicate/compat field for rules that expect `userId`
+  createdByName?: string | null;
+  authorizedBy?: string | null;
+  updatedAt?: any;
+  status?: string;
 }
 
 export interface Sale extends SaleData {
@@ -45,9 +53,20 @@ class SalesService {
    */
   async createSale(saleData: Omit<SaleData, 'createdAt'>): Promise<string> {
     try {
+      const now = firestore.Timestamp.now();
+      const currentUser = authService ? authService.currentUser : null;
+
       const saleWithTimestamp: SaleData = {
         ...saleData,
-        createdAt: firestore.Timestamp.now(),
+        createdAt: now,
+        updatedAt: now,
+        // Audit fields injected server-side by the service
+        createdBy: currentUser ? currentUser.uid : null,
+        userId: currentUser ? currentUser.uid : null,
+        createdByName: currentUser
+          ? currentUser.displayName || currentUser.email || null
+          : null,
+        authorizedBy: currentUser ? currentUser.uid : null,
       };
 
       const docRef = await this.salesCollection.add(saleWithTimestamp);

@@ -1515,6 +1515,8 @@ const SalesScreen: React.FC = () => {
       }
 
       // Build typed object but avoid sending undefined fields to Firestore
+      const now = firestore.Timestamp.now();
+
       const typed: Partial<Sale> = {
         itemId: itemId || null,
         sku: sku.trim(),
@@ -1530,9 +1532,11 @@ const SalesScreen: React.FC = () => {
         paidAmount: paidTotalNum,
         remainingAmount: Math.max(0, totalPriceNum - paidTotalNum),
         status: getSaleStatus(totalPriceNum, paidTotalNum),
-        createdAt: firestore.Timestamp.now(),
-        // Audit fields
+        createdAt: now,
+        updatedAt: now,
+        // Audit fields (keep client-side in sync with service)
         createdBy: currentUser ? currentUser.uid : null,
+        userId: currentUser ? currentUser.uid : null,
         createdByName: currentUser
           ? currentUser.displayName || currentUser.email || null
           : null,
@@ -1547,10 +1551,12 @@ const SalesScreen: React.FC = () => {
 
       // Attach audit fields (who created and authorized the sale)
       saleData.createdBy = currentUser ? currentUser.uid : null;
+      saleData.userId = currentUser ? currentUser.uid : null;
       saleData.createdByName = currentUser
         ? currentUser.displayName || currentUser.email || null
         : null;
       saleData.authorizedBy = currentUser ? currentUser.uid : null;
+      saleData.updatedAt = now;
 
       // Add sale to Firestore
       await collection(firestore(), 'sales').add(saleData);
