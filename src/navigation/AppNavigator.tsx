@@ -20,7 +20,7 @@ import AddItemScreen from '../screens/inventory/AddItemScreen';
 import ItemDetailsScreen from '../screens/inventory/ItemDetailsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import HowItWorksScreen from '../screens/settings/HowItWorksScreen';
-import SalesPlaceholder from '../screens/sales/SalesPlaceholder';
+import SalesScreen from '../screens/sales/SalesScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -90,6 +90,11 @@ const MainTabs = () => (
     <Tab.Screen
       name="Inventory"
       component={InventoryStack}
+      listeners={({ navigation }) => ({
+        tabPress: () => {
+          navigation.navigate('Inventory', { screen: 'InventoryList' });
+        },
+      })}
       options={{
         tabBarLabel: 'Inventory',
         tabBarIcon: InventoryTabIcon,
@@ -105,7 +110,7 @@ const MainTabs = () => (
     />
     <Tab.Screen
       name="Sales"
-      component={SalesPlaceholder}
+      component={SalesScreen}
       options={{
         tabBarLabel: 'Sales',
         tabBarIcon: SalesTabIcon,

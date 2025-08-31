@@ -121,7 +121,13 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
   };
 
   const handleSale = () => {
-    setSaleModalVisible(true);
+    // Navigate to the Sales screen and pre-fill with current item info
+    (navigation as any).navigate('Sales', {
+      itemId: currentItem.id,
+      sku: currentItem.sku,
+      name: currentItem.name,
+      unitPrice: currentItem.unitPrice,
+    });
   };
 
   const handleRestock = () => {
