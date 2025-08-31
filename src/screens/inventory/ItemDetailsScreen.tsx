@@ -123,10 +123,12 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
   const handleSale = () => {
     // Navigate to the Sales screen and pre-fill with current item info
     (navigation as any).navigate('Sales', {
-      itemId: currentItem.id,
-      sku: currentItem.sku,
-      name: currentItem.name,
-      unitPrice: currentItem.unitPrice,
+      salePrefill: {
+        itemId: currentItem.id,
+        sku: currentItem.sku,
+        name: currentItem.name,
+        unitPrice: currentItem.unitPrice,
+      },
     });
   };
 
@@ -286,6 +288,65 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
             </View>
           </View>
         </View>
+        {/* Action Buttons */}
+        <View style={styles.actionsSection}>
+          <Text style={styles.sectionTitle}>Actions</Text>
+          <View style={styles.actionGrid}>
+            <TouchableOpacity
+              style={[styles.actionCard, styles.editActionCard]}
+              onPress={handleEdit}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[styles.actionIndicator, styles.editActionIndicator]}
+              />
+              <Text style={styles.actionIcon}>✏️</Text>
+              <Text style={styles.actionLabel}>Edit</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionCard, styles.saleActionCard]}
+              onPress={handleSale}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[styles.actionIndicator, styles.saleActionIndicator]}
+              />
+              <Text style={styles.actionIcon}>💰</Text>
+              <Text style={styles.actionLabel}>Sale</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionCard, styles.restockActionCard]}
+              onPress={handleRestock}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[styles.actionIndicator, styles.restockActionIndicator]}
+              />
+              <Text style={styles.actionIcon}>📦</Text>
+              <Text style={styles.actionLabel}>Restock</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.actionCard,
+                styles.deleteActionCard,
+                isDeleting && styles.actionCardDisabled,
+              ]}
+              onPress={handleDelete}
+              disabled={isDeleting}
+            >
+              <View
+                style={[styles.actionIndicator, styles.deleteActionIndicator]}
+              />
+              <Text style={styles.actionIcon}>{isDeleting ? '⏳' : '🗑️'}</Text>
+              <Text style={styles.actionLabel}>
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Product Specifications */}
         <View style={styles.specificationsSection}>
@@ -392,66 +453,6 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
                 </Text>
               </View>
             </View>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Actions</Text>
-          <View style={styles.actionGrid}>
-            <TouchableOpacity
-              style={[styles.actionCard, styles.editActionCard]}
-              onPress={handleEdit}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[styles.actionIndicator, styles.editActionIndicator]}
-              />
-              <Text style={styles.actionIcon}>✏️</Text>
-              <Text style={styles.actionLabel}>Edit</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionCard, styles.saleActionCard]}
-              onPress={handleSale}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[styles.actionIndicator, styles.saleActionIndicator]}
-              />
-              <Text style={styles.actionIcon}>💰</Text>
-              <Text style={styles.actionLabel}>Sale</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionCard, styles.restockActionCard]}
-              onPress={handleRestock}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[styles.actionIndicator, styles.restockActionIndicator]}
-              />
-              <Text style={styles.actionIcon}>📦</Text>
-              <Text style={styles.actionLabel}>Restock</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionCard,
-                styles.deleteActionCard,
-                isDeleting && styles.actionCardDisabled,
-              ]}
-              onPress={handleDelete}
-              disabled={isDeleting}
-            >
-              <View
-                style={[styles.actionIndicator, styles.deleteActionIndicator]}
-              />
-              <Text style={styles.actionIcon}>{isDeleting ? '⏳' : '🗑️'}</Text>
-              <Text style={styles.actionLabel}>
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -794,6 +795,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 12,
+    marginBottom: 12,
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -855,101 +857,75 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 12,
-    marginBottom: 20,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 12,
   },
+
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
+    justifyContent: 'flex-start',
+    gap: 10,
   },
+
   actionCard: {
-    width: '47%',
+    width: '22%', // smaller, 4 in a row
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
-    position: 'relative',
-    overflow: 'hidden',
-    minHeight: 100,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    elevation: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    transform: [{ scale: 1 }],
+    marginBottom: 10,
+    minHeight: 65, // much smaller
   },
+
   actionIndicator: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 4,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    height: 3,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
-  editActionIndicator: {
-    backgroundColor: '#3b82f6',
-  },
-  saleActionIndicator: {
-    backgroundColor: '#10b981',
-  },
-  restockActionIndicator: {
-    backgroundColor: '#f59e0b',
-  },
-  deleteActionIndicator: {
-    backgroundColor: '#ef4444',
-  },
+
+  editActionIndicator: { backgroundColor: '#3b82f6' },
+  saleActionIndicator: { backgroundColor: '#10b981' },
+  restockActionIndicator: { backgroundColor: '#f59e0b' },
+  deleteActionIndicator: { backgroundColor: '#ef4444' },
+
   actionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginTop: 6,
-    marginBottom: 2,
+    fontSize: 10, // smaller font
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 4,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
     textTransform: 'uppercase',
   },
+
   actionIcon: {
-    fontSize: 24,
+    fontSize: 18, // smaller icons
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
+
   actionCardDisabled: {
     opacity: 0.5,
     transform: [{ scale: 0.95 }],
   },
-  editActionCard: {
-    backgroundColor: '#f8faff',
-    borderColor: '#d1e7ff',
-    shadowColor: '#3b82f6',
-  },
-  saleActionCard: {
-    backgroundColor: '#f0fff4',
-    borderColor: '#bbf7d0',
-    shadowColor: '#10b981',
-  },
-  restockActionCard: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#fde68a',
-    shadowColor: '#f59e0b',
-  },
-  deleteActionCard: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#fecaca',
-    shadowColor: '#ef4444',
-  },
+
+  // Variant Colors
+  editActionCard: { backgroundColor: '#f8faff', borderColor: '#dbeafe' },
+  saleActionCard: { backgroundColor: '#f0fff4', borderColor: '#bbf7d0' },
+  restockActionCard: { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
+  deleteActionCard: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+
   // Modal Styles
   modalOverlay: {
     flex: 1,

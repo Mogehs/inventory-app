@@ -137,6 +137,25 @@ export const AddIcon: React.FC<IconProps> = ({
   );
 };
 
+/* Eye / EyeOff icons used in auth screens */
+export const EyeIcon: React.FC<IconProps> = ({
+  size = 20,
+  color = '#6B7280',
+}) => (
+  <View style={[styles.iconContainer, { width: size, height: size }]}>
+    <Text style={[styles.iconText, { fontSize: size, color }]}>👁️</Text>
+  </View>
+);
+
+export const EyeOffIcon: React.FC<IconProps> = ({
+  size = 20,
+  color = '#6B7280',
+}) => (
+  <View style={[styles.iconContainer, { width: size, height: size }]}>
+    <Text style={[styles.iconText, { fontSize: size, color }]}>🙈</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   iconContainer: {
     justifyContent: 'center',

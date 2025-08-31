@@ -74,3 +74,36 @@ export interface StockAlert {
   isRead: boolean;
   createdAt: Date;
 }
+
+export interface Sale {
+  id: string;
+  itemId?: string;
+  sku: string;
+  name?: string;
+  customer: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  paidCash: number;
+  paidOnline: number;
+  paymentPlatform?: string;
+  transactionId?: string;
+  paidAmount: number;
+  remainingAmount: number;
+  status: 'completed' | 'partial' | 'pending';
+  notes?: string;
+  createdAt: any; // Firestore timestamp
+  productName?: string;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
