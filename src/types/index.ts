@@ -93,6 +93,10 @@ export interface Sale {
   status: 'completed' | 'partial' | 'pending';
   notes?: string;
   createdAt: any; // Firestore timestamp
+  // Audit fields
+  createdBy?: string | null;
+  createdByName?: string | null;
+  authorizedBy?: string | null;
   productName?: string;
 }
 

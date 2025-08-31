@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
 import firestore, { collection } from '@react-native-firebase/firestore';
 import { useToast } from '../../components/ToastProvider';
 import { Sale, ValidationError } from '../../types';
@@ -1218,6 +1219,8 @@ const SaleItemComponent: React.FC<{ item: Sale }> = ({ item }) => {
 const SalesScreen: React.FC = () => {
   const route = useRoute<any>();
   const toast = useToast();
+  const auth = useAuth();
+  const currentUser = auth.user;
   // Accept either a nested `salePrefill` or flat params
   const rawParams = route.params || {};
   const prefill = rawParams.salePrefill || rawParams || {};
@@ -1528,6 +1531,12 @@ const SalesScreen: React.FC = () => {
         remainingAmount: Math.max(0, totalPriceNum - paidTotalNum),
         status: getSaleStatus(totalPriceNum, paidTotalNum),
         createdAt: firestore.Timestamp.now(),
+        // Audit fields
+        createdBy: currentUser ? currentUser.uid : null,
+        createdByName: currentUser
+          ? currentUser.displayName || currentUser.email || null
+          : null,
+        authorizedBy: currentUser ? currentUser.uid : null,
       };
 
       const saleData: Record<string, any> = {};
@@ -1535,6 +1544,13 @@ const SalesScreen: React.FC = () => {
         // convert explicit nulls through (keep nulls, remove undefined)
         if (typeof v !== 'undefined') saleData[k] = v;
       });
+
+      // Attach audit fields (who created and authorized the sale)
+      saleData.createdBy = currentUser ? currentUser.uid : null;
+      saleData.createdByName = currentUser
+        ? currentUser.displayName || currentUser.email || null
+        : null;
+      saleData.authorizedBy = currentUser ? currentUser.uid : null;
 
       // Add sale to Firestore
       await collection(firestore(), 'sales').add(saleData);
