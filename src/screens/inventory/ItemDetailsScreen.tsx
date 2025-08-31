@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
 import { InventoryItem } from '../../types';
 import { Timestamp } from '@react-native-firebase/firestore';
@@ -63,22 +63,47 @@ const formatDate = (date: any): string => {
 };
 
 const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
-  const { item } = route.params;
+  const { item: initialItem } = route.params;
   const navigation = useNavigation();
+  const [currentItem, setCurrentItem] = useState<InventoryItem>(initialItem);
   const [saleModalVisible, setSaleModalVisible] = useState(false);
   const [restockModalVisible, setRestockModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteSuccessModalVisible, setDeleteSuccessModalVisible] =
+    useState(false);
   const [saleQuantity, setSaleQuantity] = useState('');
   const [restockQuantity, setRestockQuantity] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const totalValue = item.quantity * item.unitPrice;
+  // Refresh item data when returning from edit screen
+  useFocusEffect(
+    useCallback(() => {
+      const refreshItemData = async () => {
+        try {
+          const doc = await firestore()
+            .collection('inventory')
+            .doc(currentItem.id)
+            .get();
+          if (doc.exists()) {
+            const updatedItem = { id: doc.id, ...doc.data() } as InventoryItem;
+            setCurrentItem(updatedItem);
+          }
+        } catch (error) {
+          console.error('Error refreshing item data:', error);
+        }
+      };
+
+      refreshItemData();
+    }, [currentItem.id]),
+  );
+
+  const totalValue = currentItem.quantity * currentItem.unitPrice;
 
   // Determine stock status
   const getStockStatus = () => {
-    if (item.quantity <= 0) {
+    if (currentItem.quantity <= 0) {
       return { text: 'Out of Stock', color: '#dc3545' };
-    } else if (item.quantity <= item.minStockLevel) {
+    } else if (currentItem.quantity <= currentItem.minStockLevel) {
       return { text: 'Low Stock', color: '#fd7e14' };
     } else {
       return { text: 'In Stock', color: '#198754' };
@@ -90,7 +115,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
   const handleEdit = () => {
     // Navigate to AddItem screen with the current item for editing
     (navigation as any).navigate('AddItem', {
-      item: item,
+      item: currentItem,
       isEdit: true,
     });
   };
@@ -111,24 +136,12 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
     setIsDeleting(true);
     try {
       // Delete the item from Firestore
-      await firestore().collection('inventory').doc(item.id).delete();
+      await firestore().collection('inventory').doc(currentItem.id).delete();
 
       setDeleteModalVisible(false);
 
-      // Show success message and navigate back
-      Alert.alert(
-        '✅ Success',
-        `"${item.name}" has been deleted successfully`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate back to inventory - the useFocusEffect will automatically refresh the list
-              navigation.goBack();
-            },
-          },
-        ],
-      );
+      // Show premium success modal instead of basic alert
+      setDeleteSuccessModalVisible(true);
     } catch (error) {
       console.error('Delete error:', error);
       Alert.alert(
@@ -141,6 +154,12 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
     }
   };
 
+  const handleDeleteSuccess = () => {
+    setDeleteSuccessModalVisible(false);
+    // Navigate back to inventory - the useFocusEffect will automatically refresh the list
+    navigation.goBack();
+  };
+
   const confirmSale = async () => {
     const quantity = parseInt(saleQuantity, 10);
     if (!quantity || quantity <= 0) {
@@ -148,14 +167,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
       return;
     }
 
-    if (quantity > item.quantity) {
+    if (quantity > currentItem.quantity) {
       Alert.alert('Error', 'Cannot sell more than available stock');
       return;
     }
 
     try {
-      const newQuantity = item.quantity - quantity;
-      await firestore().collection('inventory').doc(item.id).update({
+      const newQuantity = currentItem.quantity - quantity;
+      await firestore().collection('inventory').doc(currentItem.id).update({
         quantity: newQuantity,
         updatedAt: firestore.Timestamp.now(),
       });
@@ -177,8 +196,8 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
     }
 
     try {
-      const newQuantity = item.quantity + quantity;
-      await firestore().collection('inventory').doc(item.id).update({
+      const newQuantity = currentItem.quantity + quantity;
+      await firestore().collection('inventory').doc(currentItem.id).update({
         quantity: newQuantity,
         updatedAt: firestore.Timestamp.now(),
       });
@@ -201,9 +220,9 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
         {/* Hero Section with Product Image and Name */}
         <View style={styles.heroSection}>
           <View style={styles.imageContainer}>
-            {item.imageUrl ? (
+            {currentItem.imageUrl ? (
               <Image
-                source={{ uri: item.imageUrl }}
+                source={{ uri: currentItem.imageUrl }}
                 style={styles.productImage}
                 resizeMode="cover"
               />
@@ -229,10 +248,10 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
           </View>
 
           <View style={styles.productInfo}>
-            <Text style={styles.productName}>{item.name}</Text>
-            <Text style={styles.productSku}>SKU: {item.sku}</Text>
-            {item.description && (
-              <Text style={styles.description}>{item.description}</Text>
+            <Text style={styles.productName}>{currentItem.name}</Text>
+            <Text style={styles.productSku}>SKU: {currentItem.sku}</Text>
+            {currentItem.description && (
+              <Text style={styles.description}>{currentItem.description}</Text>
             )}
           </View>
         </View>
@@ -242,14 +261,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
           <View style={styles.metricsGrid}>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Stock</Text>
-              <Text style={styles.metricNumber}>{item.quantity}</Text>
+              <Text style={styles.metricNumber}>{currentItem.quantity}</Text>
               <View style={[styles.metricIndicator, styles.stockIndicator]} />
             </View>
 
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Price</Text>
               <Text style={styles.metricNumber}>
-                ${item.unitPrice.toFixed(2)}
+                ${currentItem.unitPrice.toFixed(2)}
               </Text>
               <View style={[styles.metricIndicator, styles.priceIndicator]} />
             </View>
@@ -272,17 +291,17 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Category</Text>
                 <Text style={styles.specValue}>
-                  {item.category || 'Uncategorized'}
+                  {currentItem.category || 'Uncategorized'}
                 </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Location</Text>
-                <Text style={styles.specValue}>{item.location}</Text>
+                <Text style={styles.specValue}>{currentItem.location}</Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Barcode</Text>
                 <Text style={[styles.specValue, styles.monoFont]}>
-                  {item.barcode || 'Not assigned'}
+                  {currentItem.barcode || 'Not assigned'}
                 </Text>
               </View>
             </View>
@@ -294,19 +313,19 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Cost Price</Text>
                 <Text style={styles.specValue}>
-                  ${item.costPrice.toFixed(2)}
+                  ${currentItem.costPrice.toFixed(2)}
                 </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Selling Price</Text>
                 <Text style={styles.specValue}>
-                  ${item.unitPrice.toFixed(2)}
+                  ${currentItem.unitPrice.toFixed(2)}
                 </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Profit Margin</Text>
                 <Text style={[styles.specValue, styles.profitColor]}>
-                  ${(item.unitPrice - item.costPrice).toFixed(2)}
+                  ${(currentItem.unitPrice - currentItem.costPrice).toFixed(2)}
                 </Text>
               </View>
             </View>
@@ -317,27 +336,33 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               <Text style={styles.specGroupTitle}>Stock Management</Text>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Current Stock</Text>
-                <Text style={styles.specValue}>{item.quantity} units</Text>
+                <Text style={styles.specValue}>
+                  {currentItem.quantity} units
+                </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Minimum Level</Text>
-                <Text style={styles.specValue}>{item.minStockLevel} units</Text>
+                <Text style={styles.specValue}>
+                  {currentItem.minStockLevel} units
+                </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Maximum Level</Text>
-                <Text style={styles.specValue}>{item.maxStockLevel} units</Text>
+                <Text style={styles.specValue}>
+                  {currentItem.maxStockLevel} units
+                </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Reorder Status</Text>
                 <Text
                   style={[
                     styles.specValue,
-                    item.quantity <= item.minStockLevel
+                    currentItem.quantity <= currentItem.minStockLevel
                       ? styles.warningColor
                       : styles.successColor,
                   ]}
                 >
-                  {item.quantity <= item.minStockLevel
+                  {currentItem.quantity <= currentItem.minStockLevel
                     ? 'Reorder Required'
                     : 'Sufficient Stock'}
                 </Text>
@@ -351,13 +376,13 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Created</Text>
                 <Text style={styles.specValue}>
-                  {formatDate(item.createdAt)}
+                  {formatDate(currentItem.createdAt)}
                 </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Last Updated</Text>
                 <Text style={styles.specValue}>
-                  {formatDate(item.updatedAt)}
+                  {formatDate(currentItem.updatedAt)}
                 </Text>
               </View>
             </View>
@@ -374,7 +399,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               activeOpacity={0.7}
             >
               <View
-                style={[styles.actionIndicator, { backgroundColor: '#3b82f6' }]}
+                style={[styles.actionIndicator, styles.editActionIndicator]}
               />
               <Text style={styles.actionIcon}>✏️</Text>
               <Text style={styles.actionLabel}>Edit</Text>
@@ -386,7 +411,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               activeOpacity={0.7}
             >
               <View
-                style={[styles.actionIndicator, { backgroundColor: '#10b981' }]}
+                style={[styles.actionIndicator, styles.saleActionIndicator]}
               />
               <Text style={styles.actionIcon}>💰</Text>
               <Text style={styles.actionLabel}>Sale</Text>
@@ -398,7 +423,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               activeOpacity={0.7}
             >
               <View
-                style={[styles.actionIndicator, { backgroundColor: '#f59e0b' }]}
+                style={[styles.actionIndicator, styles.restockActionIndicator]}
               />
               <Text style={styles.actionIcon}>📦</Text>
               <Text style={styles.actionLabel}>Restock</Text>
@@ -407,13 +432,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
             <TouchableOpacity
               style={[
                 styles.actionCard,
+                styles.deleteActionCard,
                 isDeleting && styles.actionCardDisabled,
               ]}
               onPress={handleDelete}
               disabled={isDeleting}
             >
               <View
-                style={[styles.actionIndicator, { backgroundColor: '#ef4444' }]}
+                style={[styles.actionIndicator, styles.deleteActionIndicator]}
               />
               <Text style={styles.actionIcon}>{isDeleting ? '⏳' : '🗑️'}</Text>
               <Text style={styles.actionLabel}>
@@ -447,7 +473,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
                 <Text style={styles.inputUnit}>units</Text>
               </View>
               <Text style={styles.availableStock}>
-                Available: {item.quantity}
+                Available: {currentItem.quantity}
               </Text>
             </View>
 
@@ -489,7 +515,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
                 <Text style={styles.inputUnit}>units</Text>
               </View>
               <Text style={styles.availableStock}>
-                Current: {item.quantity}
+                Current: {currentItem.quantity}
               </Text>
             </View>
 
@@ -521,7 +547,8 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               </View>
               <Text style={styles.modalTitle}>Delete Item</Text>
               <Text style={styles.deleteModalSubtitle}>
-                Are you sure you want to permanently delete "{item.name}"?
+                Are you sure you want to permanently delete "{currentItem.name}
+                "?
               </Text>
               <Text style={styles.deleteModalWarning}>
                 This action cannot be undone and will remove all associated
@@ -548,6 +575,40 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
                 <Text style={styles.deleteText}>
                   {isDeleting ? 'Deleting...' : 'Delete Forever'}
                 </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Premium Delete Success Modal */}
+      <Modal
+        visible={deleteSuccessModalVisible}
+        animationType="fade"
+        transparent
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.successModalContent]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.successModalIcon}>
+                <Text style={styles.successIconText}>✅</Text>
+              </View>
+              <Text style={styles.modalTitle}>Successfully Deleted</Text>
+              <Text style={styles.successModalSubtitle}>
+                "{currentItem.name}" has been permanently removed from your
+                inventory
+              </Text>
+              <Text style={styles.successModalDetails}>
+                The item and all associated data have been deleted successfully
+              </Text>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.successBtn}
+                onPress={handleDeleteSuccess}
+              >
+                <Text style={styles.successBtnText}>Continue</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -801,26 +862,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
   actionCard: {
     width: '47%',
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1.5,
     borderColor: '#f1f5f9',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
     position: 'relative',
     overflow: 'hidden',
-    minHeight: 80,
+    minHeight: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     transform: [{ scale: 1 }],
   },
   actionIndicator: {
@@ -828,40 +889,60 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 3,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    height: 4,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  editActionIndicator: {
+    backgroundColor: '#3b82f6',
+  },
+  saleActionIndicator: {
+    backgroundColor: '#10b981',
+  },
+  restockActionIndicator: {
+    backgroundColor: '#f59e0b',
+  },
+  deleteActionIndicator: {
+    backgroundColor: '#ef4444',
   },
   actionLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#1f2937',
-    marginTop: 4,
+    marginTop: 6,
     marginBottom: 2,
     textAlign: 'center',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   actionIcon: {
-    fontSize: 20,
+    fontSize: 24,
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   actionCardDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
     transform: [{ scale: 0.95 }],
   },
   editActionCard: {
-    backgroundColor: '#fafaff',
-    borderColor: '#e0e7ff',
+    backgroundColor: '#f8faff',
+    borderColor: '#d1e7ff',
+    shadowColor: '#3b82f6',
   },
   saleActionCard: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#dcfce7',
+    backgroundColor: '#f0fff4',
+    borderColor: '#bbf7d0',
+    shadowColor: '#10b981',
   },
   restockActionCard: {
     backgroundColor: '#fffbeb',
-    borderColor: '#fed7aa',
+    borderColor: '#fde68a',
+    shadowColor: '#f59e0b',
+  },
+  deleteActionCard: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    shadowColor: '#ef4444',
   },
   // Modal Styles
   modalOverlay: {
@@ -1008,6 +1089,53 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   deleteText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  // Success Modal Styles
+  successModalContent: {
+    borderColor: '#d1fae5',
+    borderWidth: 1,
+  },
+  successModalIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f0fdf4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#bbf7d0',
+  },
+  successIconText: {
+    fontSize: 24,
+  },
+  successModalSubtitle: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  successModalDetails: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '400',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  successBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+  },
+  successBtnText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',

@@ -8,7 +8,7 @@ import {
   Platform,
   TouchableOpacity,
 } from 'react-native';
-import { createDocument } from '../../config/firebase';
+import { createDocument, updateDocument } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ToastProvider';
 import {
@@ -64,26 +64,30 @@ interface FormErrors {
   [key: string]: string;
 }
 
-const AddItemScreen = ({ navigation }: any) => {
+const AddItemScreen = ({ navigation, route }: any) => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
+  // Check if we're in edit mode
+  const editItem = route?.params?.item;
+  const isEditMode = route?.params?.isEdit && editItem;
+
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    description: '',
-    sku: '',
-    barcode: '',
-    category: '',
-    quantity: '',
-    minStockLevel: '10',
-    maxStockLevel: '100',
-    unitPrice: '',
-    costPrice: '',
-    location: '',
-    supplier: '',
-    imageUrl: '',
+    name: isEditMode ? editItem.name : '',
+    description: isEditMode ? editItem.description : '',
+    sku: isEditMode ? editItem.sku : '',
+    barcode: isEditMode ? editItem.barcode || '' : '',
+    category: isEditMode ? editItem.category : '',
+    quantity: isEditMode ? editItem.quantity.toString() : '',
+    minStockLevel: isEditMode ? editItem.minStockLevel.toString() : '10',
+    maxStockLevel: isEditMode ? editItem.maxStockLevel.toString() : '100',
+    unitPrice: isEditMode ? editItem.unitPrice.toString() : '',
+    costPrice: isEditMode ? editItem.costPrice.toString() : '',
+    location: isEditMode ? editItem.location : '',
+    supplier: isEditMode ? editItem.supplier || '' : '',
+    imageUrl: isEditMode ? editItem.imageUrl || '' : '',
   });
 
   const handleInputChange = (field: keyof FormData, value: string) => {
@@ -202,22 +206,43 @@ const AddItemScreen = ({ navigation }: any) => {
           ? (Number(formData.unitPrice) - Number(formData.costPrice)) *
             Number(formData.quantity)
           : 0,
-        createdAt: new Date(),
         updatedAt: new Date(),
-        createdBy: user?.uid || 'unknown',
+        ...(isEditMode
+          ? {}
+          : {
+              createdAt: new Date(),
+              createdBy: user?.uid || 'unknown',
+            }),
       };
 
-      const result = await createDocument('inventory', itemData);
-
-      if (result.success) {
-        showToast('✅ Item added successfully!', 'success');
-        navigation.goBack();
+      let result;
+      if (isEditMode) {
+        // Update existing item
+        result = await updateDocument('inventory', editItem.id, itemData);
+        if (result.success) {
+          showToast('✅ Item updated successfully!', 'success');
+          navigation.goBack();
+        } else {
+          showToast('Failed to update item. Please try again.', 'error');
+        }
       } else {
-        showToast('Failed to add item. Please try again.', 'error');
+        // Create new item
+        result = await createDocument('inventory', itemData);
+        if (result.success) {
+          showToast('✅ Item added successfully!', 'success');
+          navigation.goBack();
+        } else {
+          showToast('Failed to add item. Please try again.', 'error');
+        }
       }
     } catch (error) {
-      console.error('Error adding item:', error);
-      showToast('An error occurred while adding the item', 'error');
+      console.error('Error saving item:', error);
+      showToast(
+        `An error occurred while ${
+          isEditMode ? 'updating' : 'adding'
+        } the item`,
+        'error',
+      );
     } finally {
       setLoading(false);
     }
@@ -231,7 +256,12 @@ const AddItemScreen = ({ navigation }: any) => {
   };
 
   if (loading) {
-    return <LoadingSpinner visible={true} text="Adding item..." />;
+    return (
+      <LoadingSpinner
+        visible={true}
+        text={isEditMode ? 'Updating item...' : 'Adding item...'}
+      />
+    );
   }
 
   return (
@@ -247,9 +277,13 @@ const AddItemScreen = ({ navigation }: any) => {
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Add New Item</Text>
+            <Text style={styles.title}>
+              {isEditMode ? 'Edit Item' : 'Add New Item'}
+            </Text>
             <Text style={styles.subtitle}>
-              Fill in the details to add a new item to your inventory
+              {isEditMode
+                ? 'Update the item details below'
+                : 'Fill in the details to add a new item to your inventory'}
             </Text>
           </View>
 
@@ -438,7 +472,7 @@ const AddItemScreen = ({ navigation }: any) => {
           {/* Submit Button */}
           <View style={styles.buttonContainer}>
             <CustomButton
-              title="Add Item to Inventory"
+              title={isEditMode ? 'Update Item' : 'Add Item to Inventory'}
               onPress={handleSubmit}
               loading={loading}
               style={styles.submitButton}
@@ -531,11 +565,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   buttonContainer: {
-    marginTop: 20,
+    marginTop: 24,
+    paddingHorizontal: 4,
   },
   submitButton: {
-    backgroundColor: '#059669',
-    paddingVertical: 16,
+    backgroundColor: '#3b82f6',
+    paddingVertical: 18,
+    borderRadius: 14,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });
 
