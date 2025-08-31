@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 
 interface IconProps {
   focused?: boolean;
@@ -7,8 +7,9 @@ interface IconProps {
   color?: string;
 }
 
+/* Dashboard Icon */
 export const DashboardIcon: React.FC<IconProps> = ({
-  focused,
+  focused = false,
   size = 24,
   color = '#6B7280',
 }) => {
@@ -21,19 +22,13 @@ export const DashboardIcon: React.FC<IconProps> = ({
         <View
           style={[
             styles.dashboardGrid,
-            {
-              backgroundColor: color,
-              opacity: gridOpacity,
-            },
+            { backgroundColor: color, opacity: gridOpacity },
           ]}
         />
         <View
           style={[
             styles.dashboardGrid,
-            {
-              backgroundColor: color,
-              opacity: gridOpacity,
-            },
+            { backgroundColor: color, opacity: gridOpacity },
           ]}
         />
         <View style={[styles.dashboardGrid, { backgroundColor: color }]} />
@@ -42,8 +37,9 @@ export const DashboardIcon: React.FC<IconProps> = ({
   );
 };
 
+/* Inventory Icon */
 export const InventoryIcon: React.FC<IconProps> = ({
-  focused,
+  focused = false,
   size = 24,
   color = '#6B7280',
 }) => {
@@ -55,18 +51,13 @@ export const InventoryIcon: React.FC<IconProps> = ({
       <View
         style={[
           styles.inventoryBox,
-          {
-            borderColor: color,
-            backgroundColor: boxBackground,
-          },
+          { borderColor: color, backgroundColor: boxBackground },
         ]}
       >
         <View
           style={[
             styles.inventoryHandle,
-            {
-              backgroundColor: handleBackground,
-            },
+            { backgroundColor: handleBackground },
           ]}
         />
       </View>
@@ -74,6 +65,7 @@ export const InventoryIcon: React.FC<IconProps> = ({
   );
 };
 
+/* Settings Icon */
 export const SettingsIcon: React.FC<IconProps> = ({
   size = 24,
   color = '#6B7280',
@@ -84,6 +76,66 @@ export const SettingsIcon: React.FC<IconProps> = ({
     </View>
   </View>
 );
+
+/* Sales Icon ($ symbol) */
+export const SalesIcon: React.FC<IconProps> = ({
+  focused = false,
+  size = 24,
+  color = '#6B7280',
+}) => {
+  return (
+    <View style={[styles.iconContainer, { width: size, height: size }]}>
+      <View
+        style={[
+          styles.salesIcon,
+          {
+            borderColor: color,
+            backgroundColor: focused ? color : 'transparent',
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.iconText,
+            { color: focused ? '#FFFFFF' : color, fontSize: size * 0.65 },
+          ]}
+        >
+          $
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+/* Add Icon (+ symbol) */
+export const AddIcon: React.FC<IconProps> = ({
+  focused = false,
+  size = 28,
+  color = '#6B7280',
+}) => {
+  return (
+    <View style={[styles.iconContainer, { width: size, height: size }]}>
+      <View
+        style={[
+          styles.addIcon,
+          {
+            borderColor: color,
+            backgroundColor: focused ? color : 'transparent',
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.iconText,
+            { color: focused ? '#FFFFFF' : color, fontSize: size * 0.75 },
+          ]}
+        >
+          +
+        </Text>
+      </View>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   iconContainer: {
@@ -133,5 +185,26 @@ const styles = StyleSheet.create({
     width: '35%',
     height: '35%',
     borderRadius: 50,
+  },
+  salesIcon: {
+    width: '85%',
+    height: '85%',
+    borderWidth: 1.2,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addIcon: {
+    width: '90%',
+    height: '90%',
+    borderWidth: 1.2,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconText: {
+    fontWeight: '700',
+    includeFontPadding: false, // removes extra padding warnings
+    textAlignVertical: 'center',
   },
 });
