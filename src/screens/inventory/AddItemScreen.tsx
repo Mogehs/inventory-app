@@ -24,19 +24,18 @@ interface FormData {
   name: string;
   description: string;
   sku: string;
-  barcode: string;
   category: string;
   quantity: string;
   minStockLevel: string;
   maxStockLevel: string;
   unitPrice: string;
   costPrice: string;
-  location: string;
   supplier: string;
+  supplierPaid: string;
   imageUrl: string;
 }
 
-// Predefined categories for easy selection
+// Predefined categories
 const INVENTORY_CATEGORIES: CategoryOption[] = [
   { label: 'Electronics', value: 'electronics', icon: '📱' },
   { label: 'Clothing & Apparel', value: 'clothing', icon: '👕' },
@@ -70,7 +69,6 @@ const AddItemScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
-  // Check if we're in edit mode
   const editItem = route?.params?.item;
   const isEditMode = route?.params?.isEdit && editItem;
 
@@ -78,101 +76,54 @@ const AddItemScreen = ({ navigation, route }: any) => {
     name: isEditMode ? editItem.name : '',
     description: isEditMode ? editItem.description : '',
     sku: isEditMode ? editItem.sku : '',
-    barcode: isEditMode ? editItem.barcode || '' : '',
     category: isEditMode ? editItem.category : '',
     quantity: isEditMode ? editItem.quantity.toString() : '',
     minStockLevel: isEditMode ? editItem.minStockLevel.toString() : '10',
     maxStockLevel: isEditMode ? editItem.maxStockLevel.toString() : '100',
     unitPrice: isEditMode ? editItem.unitPrice.toString() : '',
     costPrice: isEditMode ? editItem.costPrice.toString() : '',
-    location: isEditMode ? editItem.location : '',
     supplier: isEditMode ? editItem.supplier || '' : '',
+    supplierPaid:
+      isEditMode && editItem.supplierPaid != null
+        ? String(editItem.supplierPaid)
+        : '',
     imageUrl: isEditMode ? editItem.imageUrl || '' : '',
   });
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-
-    // Required field validation
     const requiredFields = {
       name: 'Item name is required',
       sku: 'SKU is required',
       category: 'Category is required',
       quantity: 'Quantity is required',
       unitPrice: 'Unit price is required',
-      location: 'Storage location is required',
+      supplier: 'Supplier is required',
     };
-
     Object.entries(requiredFields).forEach(([field, message]) => {
       if (!formData[field as keyof FormData].trim()) {
         newErrors[field] = message;
       }
     });
-
-    // SKU format validation
-    if (formData.sku && !/^[A-Z0-9-]{3,20}$/.test(formData.sku)) {
-      newErrors.sku = 'SKU must be 3-20 characters (A-Z, 0-9, -)';
+    if (formData.quantity && Number(formData.quantity) < 0) {
+      newErrors.quantity = 'Quantity must be positive';
     }
-
-    // Quantity validation
-    if (formData.quantity) {
-      const qty = Number(formData.quantity);
-      if (isNaN(qty) || qty < 0) {
-        newErrors.quantity = 'Quantity must be a positive number';
-      }
+    if (formData.unitPrice && Number(formData.unitPrice) <= 0) {
+      newErrors.unitPrice = 'Unit price must be greater than 0';
     }
-
-    // Price validation
-    if (formData.unitPrice) {
-      const price = Number(formData.unitPrice);
-      if (isNaN(price) || price <= 0) {
-        newErrors.unitPrice = 'Unit price must be greater than 0';
-      }
-    }
-
-    if (formData.costPrice) {
-      const cost = Number(formData.costPrice);
-      if (isNaN(cost) || cost < 0) {
-        newErrors.costPrice = 'Cost price must be a positive number';
-      }
-    }
-
-    // Stock level validation
-    if (formData.minStockLevel && formData.maxStockLevel) {
-      const min = Number(formData.minStockLevel);
-      const max = Number(formData.maxStockLevel);
-      if (!isNaN(min) && !isNaN(max) && min >= max) {
-        newErrors.minStockLevel = 'Min stock must be less than max stock';
-      }
-    }
-
-    // Name length validation
-    if (formData.name && formData.name.length < 2) {
-      newErrors.name = 'Item name must be at least 2 characters';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const generateSKU = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    const namePrefix = formData.name
-      .slice(0, 3)
-      .toUpperCase()
-      .replace(/[^A-Z]/g, 'X');
-    const categoryPrefix = formData.category
-      .slice(0, 2)
-      .toUpperCase()
-      .replace(/[^A-Z]/g, 'X');
+    const timestamp = Date.now().toString().slice(-5);
+    const namePrefix = formData.name.slice(0, 3).toUpperCase() || 'ITM';
+    const categoryPrefix = formData.category.slice(0, 2).toUpperCase() || 'CT';
     const generatedSKU = `${namePrefix}-${categoryPrefix}-${timestamp}`;
     handleInputChange('sku', generatedSKU);
     showToast('SKU generated successfully!', 'success');
@@ -183,66 +134,61 @@ const AddItemScreen = ({ navigation, route }: any) => {
       showToast('Please fix the errors before submitting', 'error');
       return;
     }
-
     setLoading(true);
     try {
+      const qty = Number(formData.quantity) || 0;
+      const unitCost =
+        Number(formData.costPrice) || Number(formData.unitPrice) || 0;
+      const supplierTotalCost = unitCost * qty;
+      const supplierPaid = Number(formData.supplierPaid) || 0;
+      const rawDue = supplierTotalCost - supplierPaid;
+      const supplierDue = rawDue > 0 ? rawDue : 0;
+      const supplierOverpaid = rawDue < 0 ? Math.abs(rawDue) : 0;
+
       const itemData = {
-        name: formData.name.trim(),
-        description: formData.description.trim(),
+        ...formData,
         sku: formData.sku.toUpperCase(),
-        barcode: formData.barcode.trim(),
-        category: formData.category.trim(),
-        quantity: Number(formData.quantity),
-        minStockLevel: Number(formData.minStockLevel) || 10,
-        maxStockLevel: Number(formData.maxStockLevel) || 100,
+        quantity: qty,
+        minStockLevel: Number(formData.minStockLevel),
+        maxStockLevel: Number(formData.maxStockLevel),
         unitPrice: Number(formData.unitPrice),
-        costPrice: Number(formData.costPrice) || Number(formData.unitPrice),
-        location: formData.location.trim(),
-        supplier: formData.supplier.trim(),
-        imageUrl: formData.imageUrl,
+        costPrice: unitCost,
+        // supplier payment tracking
+        supplierTotalCost,
+        supplierPaid,
+        supplierDue,
+        ...(supplierOverpaid > 0 ? { supplierOverpaid } : {}),
+        totalValue: qty * Number(formData.unitPrice),
+        profit:
+          (Number(formData.unitPrice) -
+            (Number(formData.costPrice) || Number(formData.unitPrice))) *
+          qty,
         status: 'active',
-        totalValue: Number(formData.quantity) * Number(formData.unitPrice),
-        profit: formData.costPrice
-          ? (Number(formData.unitPrice) - Number(formData.costPrice)) *
-            Number(formData.quantity)
-          : 0,
         updatedAt: new Date(),
         ...(isEditMode
           ? {}
-          : {
-              createdAt: new Date(),
-              createdBy: user?.uid || 'unknown',
-            }),
+          : { createdAt: new Date(), createdBy: user?.uid || 'unknown' }),
       };
 
       let result;
       if (isEditMode) {
-        // Update existing item
         result = await updateDocument('inventory', editItem.id, itemData);
-        if (result.success) {
-          showToast('✅ Item updated successfully!', 'success');
-          navigation.goBack();
-        } else {
-          showToast('Failed to update item. Please try again.', 'error');
-        }
       } else {
-        // Create new item
         result = await createDocument('inventory', itemData);
-        if (result.success) {
-          showToast('✅ Item added successfully!', 'success');
-          navigation.goBack();
-        } else {
-          showToast('Failed to add item. Please try again.', 'error');
-        }
+      }
+
+      if (result.success) {
+        showToast(
+          `✅ Item ${isEditMode ? 'updated' : 'added'} successfully!`,
+          'success',
+        );
+        navigation.goBack();
+      } else {
+        showToast('Operation failed. Try again.', 'error');
       }
     } catch (error) {
-      console.error('Error saving item:', error);
-      showToast(
-        `An error occurred while ${
-          isEditMode ? 'updating' : 'adding'
-        } the item`,
-        'error',
-      );
+      console.error(error);
+      showToast('Error occurred while saving item.', 'error');
     } finally {
       setLoading(false);
     }
@@ -250,9 +196,7 @@ const AddItemScreen = ({ navigation, route }: any) => {
 
   const handleImageSelected = (imageUrl: string) => {
     handleInputChange('imageUrl', imageUrl);
-    if (imageUrl) {
-      showToast('Image uploaded successfully!', 'success');
-    }
+    if (imageUrl) showToast('Image uploaded successfully!', 'success');
   };
 
   if (loading) {
@@ -276,208 +220,181 @@ const AddItemScreen = ({ navigation, route }: any) => {
       >
         <View style={styles.content}>
           {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              {isEditMode ? 'Edit Item' : 'Add New Item'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isEditMode
-                ? 'Update the item details below'
-                : 'Fill in the details to add a new item to your inventory'}
-            </Text>
-          </View>
+          <Text style={styles.title}>
+            {isEditMode ? 'Edit Item' : 'Add New Item'}
+          </Text>
 
-          {/* Image Upload Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📸 Item Photo</Text>
-            <ImagePickerComponent
-              onImageSelected={handleImageSelected}
-              currentImage={formData.imageUrl}
-              placeholder="Add Item Photo"
-            />
-          </View>
+          {/* Image */}
+          <ImagePickerComponent
+            onImageSelected={handleImageSelected}
+            currentImage={formData.imageUrl}
+            placeholder="Add Item Photo"
+          />
 
-          {/* Basic Information */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📋 Basic Information</Text>
+          {/* Inputs */}
+          <CustomInput
+            label="Item Name"
+            value={formData.name}
+            onChangeText={v => handleInputChange('name', v)}
+            placeholder="Enter item name"
+            error={errors.name}
+          />
 
-            <CustomInput
-              label="Item Name"
-              value={formData.name}
-              onChangeText={value => handleInputChange('name', value)}
-              placeholder="Enter item name"
-              error={errors.name}
-            />
+          <CustomInput
+            label="Description"
+            value={formData.description}
+            onChangeText={v => handleInputChange('description', v)}
+            placeholder="Optional description"
+            multiline
+            numberOfLines={3}
+          />
 
-            <CustomInput
-              label="Description"
-              value={formData.description}
-              onChangeText={value => handleInputChange('description', value)}
-              placeholder="Describe the item (optional)"
-              multiline
-              numberOfLines={3}
-              error={errors.description}
-            />
-
-            <View style={styles.skuContainer}>
-              <View style={styles.skuInputContainer}>
-                <CustomInput
-                  label="SKU (Stock Keeping Unit)"
-                  value={formData.sku}
-                  onChangeText={value =>
-                    handleInputChange('sku', value.toUpperCase())
-                  }
-                  placeholder="Enter SKU"
-                  autoCapitalize="characters"
-                  error={errors.sku}
-                />
-              </View>
-              <TouchableOpacity
-                style={styles.generateButton}
-                onPress={generateSKU}
-              >
-                <Text style={styles.generateButtonText}>Generate</Text>
-              </TouchableOpacity>
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <CustomInput
+                label="SKU"
+                value={formData.sku}
+                onChangeText={v => handleInputChange('sku', v.toUpperCase())}
+                placeholder="Enter SKU"
+                error={errors.sku}
+              />
             </View>
-
-            <CategoryPicker
-              label="Category *"
-              selectedValue={formData.category}
-              onValueChange={value => handleInputChange('category', value)}
-              placeholder="Select a category"
-              error={errors.category}
-              categories={INVENTORY_CATEGORIES}
-            />
-
-            <CustomInput
-              label="Supplier"
-              value={formData.supplier}
-              onChangeText={value => handleInputChange('supplier', value)}
-              placeholder="Supplier name (optional)"
-              error={errors.supplier}
-            />
-
-            <CustomInput
-              label="Barcode"
-              value={formData.barcode}
-              onChangeText={value => handleInputChange('barcode', value)}
-              placeholder="Scan or enter barcode (optional)"
-              error={errors.barcode}
-            />
+            <TouchableOpacity
+              style={styles.generateButton}
+              onPress={generateSKU}
+            >
+              <Text style={styles.generateButtonText}>Generate</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Inventory Details */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📦 Inventory Details</Text>
+          <CategoryPicker
+            label="Category *"
+            selectedValue={formData.category}
+            onValueChange={value => handleInputChange('category', value)}
+            placeholder="Select a category"
+            error={errors.category}
+            categories={INVENTORY_CATEGORIES}
+          />
 
-            <View style={styles.row}>
-              <View style={styles.halfWidth}>
-                <CustomInput
-                  label="Quantity"
-                  value={formData.quantity}
-                  onChangeText={value => handleInputChange('quantity', value)}
-                  placeholder="0"
-                  keyboardType="numeric"
-                  error={errors.quantity}
-                />
-              </View>
-              <View style={styles.halfWidth}>
-                <CustomInput
-                  label="Storage Location"
-                  value={formData.location}
-                  onChangeText={value => handleInputChange('location', value)}
-                  placeholder="e.g., A-01-01"
-                  error={errors.location}
-                />
-              </View>
+          <CustomInput
+            label="Supplier"
+            value={formData.supplier}
+            onChangeText={v => handleInputChange('supplier', v)}
+            placeholder="Supplier name"
+            error={errors.supplier}
+          />
+
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <CustomInput
+                label="Quantity"
+                value={formData.quantity}
+                onChangeText={v => handleInputChange('quantity', v)}
+                placeholder="0"
+                keyboardType="numeric"
+                error={errors.quantity}
+              />
             </View>
-
-            <View style={styles.row}>
-              <View style={styles.halfWidth}>
-                <CustomInput
-                  label="Min Stock Level"
-                  value={formData.minStockLevel}
-                  onChangeText={value =>
-                    handleInputChange('minStockLevel', value)
-                  }
-                  placeholder="10"
-                  keyboardType="numeric"
-                  error={errors.minStockLevel}
-                />
-              </View>
-              <View style={styles.halfWidth}>
-                <CustomInput
-                  label="Max Stock Level"
-                  value={formData.maxStockLevel}
-                  onChangeText={value =>
-                    handleInputChange('maxStockLevel', value)
-                  }
-                  placeholder="100"
-                  keyboardType="numeric"
-                  error={errors.maxStockLevel}
-                />
-              </View>
+            <View style={styles.flex}>
+              <CustomInput
+                label="Min Stock"
+                value={formData.minStockLevel}
+                onChangeText={v => handleInputChange('minStockLevel', v)}
+                placeholder="10"
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.flex}>
+              <CustomInput
+                label="Max Stock"
+                value={formData.maxStockLevel}
+                onChangeText={v => handleInputChange('maxStockLevel', v)}
+                placeholder="100"
+                keyboardType="numeric"
+              />
             </View>
           </View>
 
-          {/* Pricing */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>💰 Pricing</Text>
-
-            <View style={styles.row}>
-              <View style={styles.halfWidth}>
-                <CustomInput
-                  label="Unit Price"
-                  value={formData.unitPrice}
-                  onChangeText={value => handleInputChange('unitPrice', value)}
-                  placeholder="0.00"
-                  keyboardType="numeric"
-                  error={errors.unitPrice}
-                />
-              </View>
-              <View style={styles.halfWidth}>
-                <CustomInput
-                  label="Cost Price"
-                  value={formData.costPrice}
-                  onChangeText={value => handleInputChange('costPrice', value)}
-                  placeholder="0.00"
-                  keyboardType="numeric"
-                  error={errors.costPrice}
-                />
-              </View>
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <CustomInput
+                label="Unit Price"
+                value={formData.unitPrice}
+                onChangeText={v => handleInputChange('unitPrice', v)}
+                placeholder="0.00"
+                keyboardType="numeric"
+                error={errors.unitPrice}
+              />
             </View>
+            <View style={styles.flex}>
+              <CustomInput
+                label="Cost Price"
+                value={formData.costPrice}
+                onChangeText={v => handleInputChange('costPrice', v)}
+                placeholder="0.00"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
 
-            {formData.unitPrice && formData.quantity && (
-              <View style={styles.calculationContainer}>
-                <Text style={styles.calculationText}>
-                  Total Value: $
-                  {(
-                    Number(formData.unitPrice) * Number(formData.quantity)
-                  ).toFixed(2)}
+          <CustomInput
+            label="Paid to Supplier"
+            value={formData.supplierPaid}
+            onChangeText={v => handleInputChange('supplierPaid', v)}
+            placeholder="0.00"
+            keyboardType="numeric"
+          />
+
+          {/* Supplier summary */}
+          {formData.quantity && (formData.unitPrice || formData.costPrice) && (
+            <View style={styles.supplierBox}>
+              <Text style={styles.supplierLine}>
+                Supplier Total: $
+                {(
+                  (Number(formData.costPrice) ||
+                    Number(formData.unitPrice) ||
+                    0) * Number(formData.quantity)
+                ).toFixed(2)}
+              </Text>
+              <Text style={styles.supplierLine}>
+                Paid: ${Number(formData.supplierPaid || 0).toFixed(2)}
+              </Text>
+              <Text style={styles.supplierDueLine}>
+                Remaining Due: $
+                {(
+                  (Number(formData.costPrice) ||
+                    Number(formData.unitPrice) ||
+                    0) *
+                    Number(formData.quantity) -
+                  (Number(formData.supplierPaid) || 0)
+                ).toFixed(2)}
+              </Text>
+            </View>
+          )}
+
+          {/* Calculations */}
+          {formData.quantity && formData.unitPrice && (
+            <View style={styles.calculationBox}>
+              <Text style={styles.calcText}>
+                Total: {Number(formData.unitPrice) * Number(formData.quantity)}
+              </Text>
+              {formData.costPrice && (
+                <Text style={styles.calcText}>
+                  Profit:{' '}
+                  {(Number(formData.unitPrice) - Number(formData.costPrice)) *
+                    Number(formData.quantity)}
                 </Text>
-                {formData.costPrice && (
-                  <Text style={styles.calculationText}>
-                    Profit: $
-                    {(
-                      (Number(formData.unitPrice) -
-                        Number(formData.costPrice)) *
-                      Number(formData.quantity)
-                    ).toFixed(2)}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+          )}
 
-          {/* Submit Button */}
-          <View style={styles.buttonContainer}>
-            <CustomButton
-              title={isEditMode ? 'Update Item' : 'Add Item to Inventory'}
-              onPress={handleSubmit}
-              loading={loading}
-              style={styles.submitButton}
-            />
-          </View>
+          {/* Submit */}
+          <CustomButton
+            title={isEditMode ? 'Update Item' : 'Add Item'}
+            onPress={handleSubmit}
+            loading={loading}
+            style={styles.submitButton}
+          />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -485,98 +402,54 @@ const AddItemScreen = ({ navigation, route }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAFAFA',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  header: {
-    marginBottom: 30,
-  },
+  container: { flex: 1, backgroundColor: '#FAFAFA' },
+  scrollView: { flex: 1 },
+  content: { padding: 16 },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    lineHeight: 24,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
+    color: '#111827',
     marginBottom: 16,
-    paddingBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: '#E5E7EB',
   },
-  skuContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-  },
-  skuInputContainer: {
-    flex: 1,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  flex: { flex: 1 },
   generateButton: {
     backgroundColor: '#1E40AF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 0,
+    minWidth: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  generateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidth: {
-    flex: 1,
-  },
-  calculationContainer: {
+  generateButtonText: { color: '#fff', fontWeight: '600' },
+  calculationBox: {
+    marginTop: 12,
     backgroundColor: '#F0F9FF',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
+    padding: 10,
+    borderRadius: 8,
   },
-  calculationText: {
-    fontSize: 16,
+  calcText: { fontSize: 14, fontWeight: '600', color: '#0C4A6E' },
+  submitButton: { marginTop: 20, paddingVertical: 16, borderRadius: 12 },
+  supplierBox: {
+    marginTop: 10,
+    backgroundColor: '#FEF3C7',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  supplierLine: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#0C4A6E',
+    color: '#92400E',
     marginBottom: 4,
   },
-  buttonContainer: {
-    marginTop: 24,
-    paddingHorizontal: 4,
-  },
-  submitButton: {
-    backgroundColor: '#3b82f6',
-    paddingVertical: 18,
-    borderRadius: 14,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+  supplierDueLine: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7C2D12',
   },
 });
 

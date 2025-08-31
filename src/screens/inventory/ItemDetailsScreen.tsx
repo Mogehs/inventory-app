@@ -71,6 +71,8 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteSuccessModalVisible, setDeleteSuccessModalVisible] =
     useState(false);
+  const [restockSuccessModalVisible, setRestockSuccessModalVisible] =
+    useState(false);
   const [saleQuantity, setSaleQuantity] = useState('');
   const [restockQuantity, setRestockQuantity] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -210,13 +212,18 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
         updatedAt: firestore.Timestamp.now(),
       });
 
-      Alert.alert('Success', `Added ${quantity} units successfully`);
+      // Show success modal instead of basic alert
       setRestockModalVisible(false);
       setRestockQuantity('');
-      navigation.goBack();
+      setRestockSuccessModalVisible(true);
     } catch (error) {
       Alert.alert('Error', 'Failed to restock item');
     }
+  };
+
+  const handleRestockSuccess = () => {
+    setRestockSuccessModalVisible(false);
+    navigation.goBack();
   };
 
   return (
@@ -361,16 +368,16 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
                   {currentItem.category || 'Uncategorized'}
                 </Text>
               </View>
-              <View style={styles.specRow}>
+              {/* <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Location</Text>
                 <Text style={styles.specValue}>{currentItem.location}</Text>
-              </View>
-              <View style={styles.specRow}>
+              </View> */}
+              {/* <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Barcode</Text>
                 <Text style={[styles.specValue, styles.monoFont]}>
                   {currentItem.barcode || 'Not assigned'}
                 </Text>
-              </View>
+              </View> */}
             </View>
 
             <View style={styles.separator} />
@@ -538,6 +545,39 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
                 onPress={confirmRestock}
               >
                 <Text style={styles.confirmText}>Add Stock</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Restock Success Modal */}
+      <Modal
+        visible={restockSuccessModalVisible}
+        animationType="fade"
+        transparent
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.successModalContent]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.successModalIcon}>
+                <Text style={styles.successIconText}>✅</Text>
+              </View>
+              <Text style={styles.modalTitle}>Stock Updated</Text>
+              <Text style={styles.successModalSubtitle}>
+                Stock updated successfully for "{currentItem.name}"
+              </Text>
+              <Text style={styles.successModalDetails}>
+                Current stock: {currentItem.quantity}
+              </Text>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.successBtn}
+                onPress={handleRestockSuccess}
+              >
+                <Text style={styles.successBtnText}>Continue</Text>
               </TouchableOpacity>
             </View>
           </View>

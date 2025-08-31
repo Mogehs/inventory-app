@@ -65,21 +65,21 @@ const CustomInput: React.FC<CustomInputProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   input: {
-    height: 56,
+    height: 44,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 15,
     backgroundColor: '#ffffff',
     color: '#111827',
   },
@@ -90,24 +90,24 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 56,
+    height: 44,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   passwordInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: '#111827',
-    paddingVertical: 0,
+    paddingVertical: 8,
   },
   eyeButton: {
-    padding: 4,
+    padding: 6,
   },
   eyeText: {
-    fontSize: 20,
+    fontSize: 18,
   },
   errorText: {
     fontSize: 12,

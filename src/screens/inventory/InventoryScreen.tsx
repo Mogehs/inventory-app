@@ -21,6 +21,16 @@ import { LoadingSpinner } from '../../components';
 const { width } = Dimensions.get('window');
 const ITEMS_PER_PAGE = 10; // Increased due to space-efficient single-line details
 
+// Currency formatter for PKR
+const formatPKR = (amount: number | undefined) => {
+  const val = Number(amount) || 0;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'PKR',
+    minimumFractionDigits: 2,
+  }).format(val);
+};
+
 // Categories for filtering (matching AddItemScreen)
 const CATEGORIES = [
   { label: 'All Categories', value: 'all', icon: '📋' },
@@ -194,17 +204,7 @@ const InventoryScreen = ({ navigation, route }: any) => {
     loadInventory();
   };
 
-  const getStatusColor = (item: InventoryItem) => {
-    if (item.quantity === 0) return '#EF4444';
-    if (item.quantity <= item.minStockLevel) return '#F59E0B';
-    return '#10B981';
-  };
-
-  const getStatusText = (item: InventoryItem) => {
-    if (item.quantity === 0) return 'Out of Stock';
-    if (item.quantity <= item.minStockLevel) return 'Low Stock';
-    return 'In Stock';
-  };
+  // removed status badge helpers: compact layout doesn't show badge
 
   const getCategoryInfo = (category: string) => {
     // Simply return the category as the label since it's just a text field
@@ -221,96 +221,74 @@ const InventoryScreen = ({ navigation, route }: any) => {
 
   // Enhanced card rendering - Larger, Clearer Product Details
   const renderInventoryCard = ({ item }: { item: InventoryItem }) => {
-    const statusColor = getStatusColor(item);
-    const statusText = getStatusText(item);
     const categoryInfo = getCategoryInfo(item.category);
     const totalValue = item.quantity * item.unitPrice;
 
+    // compute compact status
+    let statusColor = '#10B981';
+    let statusText = 'In Stock';
+    if (item.quantity === 0) {
+      statusColor = '#EF4444';
+      statusText = 'Out';
+    } else if (item.quantity <= item.minStockLevel) {
+      statusColor = '#F59E0B';
+      statusText = 'Low';
+    }
+
     return (
       <TouchableOpacity
-        style={styles.inventoryCard}
+        style={styles.inventoryCardCompact}
         onPress={() => navigation.navigate('ItemDetails', { item })}
         activeOpacity={0.7}
       >
-        {/* Card Header with Product Name and Status */}
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <Text style={styles.itemName} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <Text style={styles.itemSku}>SKU: {item.sku}</Text>
+        <View style={styles.compactRow}>
+          {/* Left: Image */}
+          <View style={styles.compactImageWrap}>
+            {item.imageUrl ? (
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.compactImage}
+              />
+            ) : (
+              <View style={styles.compactPlaceholder}>
+                <Text style={styles.placeholderText}>No</Text>
+              </View>
+            )}
           </View>
-          <View style={styles.cardHeaderRight}>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: statusColor + '15' },
-              ]}
-            >
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {statusText}
+
+          {/* Middle: Name, badge and SKU */}
+          <View style={styles.compactMiddle}>
+            <View style={styles.compactNameRow}>
+              <Text style={styles.compactName} numberOfLines={1}>
+                {item.name}
               </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Main Content Area */}
-        <View style={styles.cardContent}>
-          {/* Top Row: Image and Key Info */}
-          <View style={styles.topRow}>
-            {/* Product Image */}
-            <View style={styles.imageContainer}>
-              {item.imageUrl ? (
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  style={styles.itemImage}
-                />
-              ) : (
-                <View style={styles.placeholderImage}>
-                  <Text style={styles.placeholderText}>No Image</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Product Details */}
-            <View style={styles.productDetails}>
-              <View style={styles.singleLineDetails}>
-                <View style={styles.detailChip}>
-                  <Text style={styles.detailChipLabel}>Cat:</Text>
-                  <Text style={styles.detailChipValue}>
-                    {categoryInfo.label}
-                  </Text>
-                </View>
-                <View style={styles.detailChip}>
-                  <Text style={styles.detailChipLabel}>Loc:</Text>
-                  <Text style={styles.detailChipValue}>{item.location}</Text>
-                </View>
-                <View style={styles.detailChip}>
-                  <Text style={styles.detailChipLabel}>Min:</Text>
-                  <Text style={styles.detailChipValue}>
-                    {item.minStockLevel}
-                  </Text>
-                </View>
+              <View
+                style={[
+                  styles.statusBadgeCompact,
+                  { backgroundColor: statusColor + '20' },
+                ]}
+              >
+                <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                  {statusText}
+                </Text>
               </View>
             </View>
+            <Text style={styles.compactSku}>SKU: {item.sku}</Text>
+            <View style={styles.compactChips}>
+              <Text style={styles.compactChip}>{categoryInfo.label}</Text>
+              <Text style={styles.compactChip}>
+                Min Stock: {item.minStockLevel}
+              </Text>
+            </View>
           </View>
 
-          {/* Bottom Row: Stock and Price Information */}
-          <View style={styles.bottomRow}>
-            <View style={styles.stockSection}>
-              <Text style={styles.stockValue}>{item.quantity}</Text>
-              <Text style={styles.stockLabel}>Current Stock</Text>
-            </View>
-            <View style={styles.priceSection}>
-              <Text style={styles.priceValue}>
-                ${item.unitPrice.toFixed(2)}
-              </Text>
-              <Text style={styles.priceLabel}>Unit Price</Text>
-            </View>
-            <View style={styles.totalSection}>
-              <Text style={styles.totalValue}>${totalValue.toFixed(0)}</Text>
-              <Text style={styles.totalLabel}>Total Value</Text>
-            </View>
+          {/* Right: Metrics */}
+          <View style={styles.compactMetrics}>
+            <Text style={styles.compactStock}>{item.quantity}</Text>
+            <Text style={styles.compactMetricLabel}>Stock</Text>
+            <Text style={styles.compactPrice}>{formatPKR(item.unitPrice)}</Text>
+            <Text style={styles.compactMetricLabel}>Unit Price</Text>
+            <Text style={styles.compactTotal}>{formatPKR(totalValue)}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -556,12 +534,14 @@ const InventoryScreen = ({ navigation, route }: any) => {
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>
-            $
-            {filteredAndSortedItems
-              .reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
-              .toFixed(0)}
+            {formatPKR(
+              filteredAndSortedItems.reduce(
+                (sum, item) => sum + item.quantity * item.unitPrice,
+                0,
+              ),
+            )}
           </Text>
-          <Text style={styles.statLabel}>Total Value</Text>
+          <Text style={styles.statLabel}>Total Value (PKR)</Text>
         </View>
       </View>
 
@@ -818,15 +798,15 @@ const styles = StyleSheet.create({
   // Enhanced inventory card - Larger, Clearer Product Details
   inventoryCard: {
     backgroundColor: '#FFFFFF',
-    marginHorizontal: 12,
+    marginHorizontal: 10,
     marginVertical: 6,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 10,
+    padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#F3F4F6',
   },
@@ -849,21 +829,21 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   imageContainer: {
-    marginRight: 16,
+    marginRight: 12,
   },
   itemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
     backgroundColor: '#F3F4F6',
   },
   placeholderImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
@@ -872,7 +852,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   placeholderText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#9CA3AF',
     fontWeight: '500',
   },
@@ -882,14 +862,14 @@ const styles = StyleSheet.create({
   singleLineDetails: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   detailChip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -910,7 +890,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
@@ -919,7 +899,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stockValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 2,
@@ -934,7 +914,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   priceValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#059669',
     marginBottom: 2,
@@ -949,7 +929,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   totalValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#3B82F6',
     marginBottom: 2,
@@ -960,16 +940,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   itemName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 4,
-    lineHeight: 22,
+    marginBottom: 2,
+    lineHeight: 20,
   },
   itemSku: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
-    fontFamily: 'monospace',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -1125,6 +1104,107 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#3B82F6',
     fontWeight: 'bold',
+  },
+  // Compact card styles
+  inventoryCardCompact: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 10,
+    marginVertical: 4,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  compactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactImageWrap: {
+    width: 56,
+    height: 56,
+    marginRight: 10,
+  },
+  compactImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  compactPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  compactMiddle: {
+    flex: 1,
+  },
+  compactName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  compactSku: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  compactChips: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 6,
+  },
+  compactChip: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  compactMetrics: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  compactStock: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  compactMetricLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+  },
+  compactPrice: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+    marginTop: 4,
+  },
+  compactTotal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#3B82F6',
+    marginTop: 4,
+  },
+  compactNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusBadgeCompact: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 
