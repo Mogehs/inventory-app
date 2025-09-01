@@ -283,14 +283,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Price</Text>
               <Text style={styles.metricNumber}>
-                ${currentItem.unitPrice.toFixed(2)}
+                ₨{currentItem.unitPrice.toFixed(2)}
               </Text>
               <View style={[styles.metricIndicator, styles.priceIndicator]} />
             </View>
 
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Value</Text>
-              <Text style={styles.metricNumber}>${totalValue.toFixed(0)}</Text>
+              <Text style={styles.metricNumber}>₨{totalValue.toFixed(0)}</Text>
               <View style={[styles.metricIndicator, styles.valueIndicator]} />
             </View>
           </View>
@@ -387,19 +387,19 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Cost Price</Text>
                 <Text style={styles.specValue}>
-                  ${currentItem.costPrice.toFixed(2)}
+                  ₨{currentItem.costPrice.toFixed(2)}
                 </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Selling Price</Text>
                 <Text style={styles.specValue}>
-                  ${currentItem.unitPrice.toFixed(2)}
+                  ₨{currentItem.unitPrice.toFixed(2)}
                 </Text>
               </View>
               <View style={styles.specRow}>
                 <Text style={styles.specLabel}>Profit Margin</Text>
                 <Text style={[styles.specValue, styles.profitColor]}>
-                  ${(currentItem.unitPrice - currentItem.costPrice).toFixed(2)}
+                  ₨{(currentItem.unitPrice - currentItem.costPrice).toFixed(2)}
                 </Text>
               </View>
             </View>

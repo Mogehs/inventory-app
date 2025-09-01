@@ -1,5 +1,4 @@
-import firestore, { collection } from '@react-native-firebase/firestore';
-import { authService } from '../config/firebase';
+import { db, authService } from '../config/firebase';
 
 export interface SaleData {
   itemId?: string | null;
@@ -36,8 +35,8 @@ export interface EnrichedSale extends SaleData {
 }
 
 class SalesService {
-  private salesCollection = collection(firestore(), 'sales');
-  private inventoryCollection = collection(firestore(), 'inventory');
+  private salesCollection = db.collection('sales');
+  private inventoryCollection = db.collection('inventory');
 
   /**
    * Get the start of today for date filtering
@@ -69,7 +68,15 @@ class SalesService {
         authorizedBy: currentUser ? currentUser.uid : null,
       };
 
-      const docRef = await this.salesCollection.add(saleWithTimestamp);
+      // Remove undefined values to prevent Firestore errors
+      const cleanedSaleData: Record<string, any> = {};
+      Object.entries(saleWithTimestamp).forEach(([key, value]) => {
+        if (value !== undefined) {
+          cleanedSaleData[key] = value;
+        }
+      });
+
+      const docRef = await this.salesCollection.add(cleanedSaleData);
       return docRef.id;
     } catch (error) {
       console.error('Error creating sale:', error);
@@ -160,9 +167,7 @@ class SalesService {
 
         const currentUser = authService ? authService.currentUser : null;
         itemDocs.forEach((doc: any) => {
-          const docExists =
-            typeof doc.exists === 'function' ? doc.exists() : !!doc.exists;
-          if (docExists) {
+          if (doc.exists()) {
             const data = doc.data();
             // Skip inventory items owned by other users
             if (
@@ -285,7 +290,7 @@ class SalesService {
   async updateSale(saleId: string, updates: Partial<SaleData>): Promise<void> {
     try {
       const doc = await this.salesCollection.doc(saleId).get();
-      const owner = doc.exists ? (doc.data() as any)?.createdBy : null;
+      const owner = doc.exists() ? (doc.data() as any)?.createdBy : null;
       const currentUser = authService ? authService.currentUser : null;
       if (owner && owner !== currentUser?.uid) {
         throw new Error('permission-denied');
@@ -303,7 +308,7 @@ class SalesService {
   async deleteSale(saleId: string): Promise<void> {
     try {
       const doc = await this.salesCollection.doc(saleId).get();
-      const owner = doc.exists ? (doc.data() as any)?.createdBy : null;
+      const owner = doc.exists() ? (doc.data() as any)?.createdBy : null;
       const currentUser = authService ? authService.currentUser : null;
       if (owner && owner !== currentUser?.uid) {
         throw new Error('permission-denied');

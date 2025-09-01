@@ -101,9 +101,9 @@ const styles = StyleSheet.create({
   // Header styles
   pageHeader: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     shadowColor: '#000',
@@ -113,13 +113,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   pageTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '800',
     color: '#0F172A',
     marginBottom: 4,
   },
   pageSubtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#64748B',
     fontWeight: '500',
   },
@@ -130,29 +130,65 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 8,
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 5,
   },
+  statsHeader: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  statsSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 16,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statIconRevenue: {
+    backgroundColor: '#DCFCE7',
+  },
+  statIconTransactions: {
+    backgroundColor: '#DBEAFE',
+  },
+  statIconCompleted: {
+    backgroundColor: '#FEF3C7',
+  },
+  statIconText: {
+    fontSize: 16,
+  },
   statValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '900',
     color: '#0F172A',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     fontWeight: '600',
     textAlign: 'center',
@@ -162,14 +198,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
     marginHorizontal: 16,
   },
+  statsSecondaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  statSecondaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statSecondaryLabel: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  statSecondaryValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    textAlign: 'center',
+  },
+  statWarning: {
+    color: '#DC2626',
+  },
 
   // Form styles
   form: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 12,
     marginTop: 8,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -179,19 +242,19 @@ const styles = StyleSheet.create({
   formHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   formHeaderIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   formHeaderText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#0F172A',
     flex: 1,
@@ -746,7 +809,7 @@ const SalesForm: React.FC<SalesFormProps> = props => {
       {/* Form Header */}
       <View style={styles.formHeader}>
         <View style={styles.formHeaderIcon}>
-          <Text style={styles.formHeaderIconText}>💳</Text>
+          <Text style={styles.formHeaderIconText}>$</Text>
         </View>
         <Text style={styles.formHeaderText}>Record New Sale</Text>
       </View>
@@ -813,7 +876,7 @@ const SalesForm: React.FC<SalesFormProps> = props => {
             ]}
           >
             <Text style={styles.skuIconText}>
-              {isLookingUpSku ? '🔍' : matchedSkuName ? '✅' : '❌'}
+              {isLookingUpSku ? '...' : matchedSkuName ? '✓' : '✗'}
             </Text>
             <Text
               style={[
@@ -1039,30 +1102,94 @@ const StatsHeader: React.FC<{ sales: Sale[] }> = ({ sales }) => {
   const completedSales = sales.filter(
     sale => getSaleStatus(sale.totalPrice, sale.paidAmount) === 'completed',
   ).length;
+  const pendingSales = sales.filter(
+    sale => getSaleStatus(sale.totalPrice, sale.paidAmount) === 'pending',
+  ).length;
   const avgSaleValue =
     todayTransactions > 0 ? todayRevenue / todayTransactions : 0;
 
+  const totalPaid = sales.reduce(
+    (sum, sale) => sum + (sale.paidAmount || 0),
+    0,
+  );
+  const totalOutstanding = todayRevenue - totalPaid;
+
   return (
     <View style={styles.statsContainer}>
+      {/* Title Row */}
+      <View style={styles.statsHeader}>
+        <Text style={styles.statsTitle}>Today's Performance</Text>
+        <Text style={styles.statsSubtitle}>
+          {new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+          })}
+        </Text>
+      </View>
+
+      {/* Main Stats Row */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
+          <View style={[styles.statIcon, styles.statIconRevenue]}>
+            <Text style={styles.statIconText}>$</Text>
+          </View>
           <Text style={styles.statValue}>{formatCurrency(todayRevenue)}</Text>
-          <Text style={styles.statLabel}>Today's Revenue</Text>
+          <Text style={styles.statLabel}>Total Revenue</Text>
         </View>
+
         <View style={styles.statDivider} />
+
         <View style={styles.statItem}>
+          <View style={[styles.statIcon, styles.statIconTransactions]}>
+            <Text style={styles.statIconText}>#</Text>
+          </View>
           <Text style={styles.statValue}>{todayTransactions}</Text>
           <Text style={styles.statLabel}>Transactions</Text>
         </View>
+
         <View style={styles.statDivider} />
+
         <View style={styles.statItem}>
+          <View style={[styles.statIcon, styles.statIconCompleted]}>
+            <Text style={styles.statIconText}>✓</Text>
+          </View>
           <Text style={styles.statValue}>{completedSales}</Text>
           <Text style={styles.statLabel}>Completed</Text>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{formatCurrency(avgSaleValue)}</Text>
-          <Text style={styles.statLabel}>Avg Sale</Text>
+      </View>
+
+      {/* Secondary Stats Row */}
+      <View style={styles.statsSecondaryRow}>
+        <View style={styles.statSecondaryItem}>
+          <Text style={styles.statSecondaryLabel}>Avg Sale Value</Text>
+          <Text style={styles.statSecondaryValue}>
+            {formatCurrency(avgSaleValue)}
+          </Text>
+        </View>
+
+        <View style={styles.statSecondaryItem}>
+          <Text style={styles.statSecondaryLabel}>Pending</Text>
+          <Text
+            style={[
+              styles.statSecondaryValue,
+              pendingSales > 0 && styles.statWarning,
+            ]}
+          >
+            {pendingSales} sales
+          </Text>
+        </View>
+
+        <View style={styles.statSecondaryItem}>
+          <Text style={styles.statSecondaryLabel}>Outstanding</Text>
+          <Text
+            style={[
+              styles.statSecondaryValue,
+              totalOutstanding > 0 && styles.statWarning,
+            ]}
+          >
+            {formatCurrency(totalOutstanding)}
+          </Text>
         </View>
       </View>
     </View>
@@ -1071,7 +1198,7 @@ const StatsHeader: React.FC<{ sales: Sale[] }> = ({ sales }) => {
 
 const EmptyStateComponent: React.FC = () => (
   <View style={styles.emptyContainer}>
-    <Text style={styles.emptyIcon}>📊</Text>
+    <Text style={styles.emptyIcon}>$</Text>
     <Text style={styles.emptyTitle}>No Sales Today</Text>
     <Text style={styles.emptySubtitle}>
       Start by recording your first sale using the form above. Your sales will
@@ -1152,7 +1279,7 @@ const SaleItemComponent: React.FC<{ item: Sale }> = ({ item }) => {
           {paidCash > 0 && (
             <View style={styles.paymentItem}>
               <View style={[styles.paymentIcon, styles.paymentIconCash]}>
-                <Text style={styles.paymentIconText}>💵</Text>
+                <Text style={styles.paymentIconText}>C</Text>
               </View>
               <Text style={styles.paymentLabel}>Cash</Text>
               <Text style={styles.paymentValue}>
@@ -1164,7 +1291,7 @@ const SaleItemComponent: React.FC<{ item: Sale }> = ({ item }) => {
           {paidOnline > 0 && (
             <View style={styles.paymentItem}>
               <View style={[styles.paymentIcon, styles.paymentIconOnline]}>
-                <Text style={styles.paymentIconText}>💳</Text>
+                <Text style={styles.paymentIconText}>O</Text>
               </View>
               <Text style={styles.paymentLabel}>
                 {item.paymentPlatform || 'Online'}
@@ -1203,10 +1330,10 @@ const SaleItemComponent: React.FC<{ item: Sale }> = ({ item }) => {
           ]}
         >
           {saleStatus === 'completed'
-            ? '✅ Paid in Full'
+            ? 'Paid in Full'
             : saleStatus === 'partial'
-            ? '⚠️ Partially Paid'
-            : '❌ Pending Payment'}
+            ? 'Partially Paid'
+            : 'Pending Payment'}
         </Text>
       </View>
     </View>
@@ -1461,7 +1588,7 @@ const SalesScreen: React.FC = () => {
         paidCash: parseNumber(paidCash),
         paidOnline: parseNumber(paidOnline),
         // paymentPlatform intentionally omitted to avoid nullable mismatch
-        transactionId: transactionId ? transactionId : undefined,
+        ...(transactionId && { transactionId: transactionId }),
         paidAmount: paidTotalNum,
         remainingAmount: Math.max(0, totalPriceNum - paidTotalNum),
         status: getSaleStatus(totalPriceNum, paidTotalNum),
@@ -1502,7 +1629,7 @@ const SalesScreen: React.FC = () => {
         totalPrice: totalPriceNum,
         paidCash: parseNumber(paidCash),
         paidOnline: parseNumber(paidOnline),
-        transactionId: transactionId ? transactionId : undefined,
+        ...(transactionId && { transactionId: transactionId }),
         paidAmount: paidTotalNum,
         remainingAmount: Math.max(0, totalPriceNum - paidTotalNum),
         status: getSaleStatus(totalPriceNum, paidTotalNum),
