@@ -53,7 +53,7 @@ class SalesService {
    */
   async createSale(saleData: Omit<SaleData, 'createdAt'>): Promise<string> {
     try {
-      const now = firestore.Timestamp.now();
+      const now = new Date();
       const currentUser = authService ? authService.currentUser : null;
 
       const saleWithTimestamp: SaleData = {
@@ -82,14 +82,13 @@ class SalesService {
    */
   async getTodaySales(): Promise<EnrichedSale[]> {
     try {
-      const snapshot = await this.salesCollection
-        .where(
-          'createdAt',
-          '>=',
-          firestore.Timestamp.fromDate(this.getTodayStart()),
-        )
-        .orderBy('createdAt', 'desc')
-        .get();
+      const currentUser = authService ? authService.currentUser : null;
+      let query: any = this.salesCollection;
+      if (currentUser) query = query.where('createdBy', '==', currentUser.uid);
+      query = query
+        .where('createdAt', '>=', this.getTodayStart())
+        .orderBy('createdAt', 'desc');
+      const snapshot = await query.get();
 
       const rawSales = snapshot.docs.map((doc: any) => ({
         id: doc.id,
@@ -97,7 +96,43 @@ class SalesService {
       }));
 
       return await this.enrichSalesWithProductNames(rawSales);
-    } catch (error) {
+    } catch (error: any) {
+      // Detect the Firestore composite index error and give a clear, actionable message
+      const message = String(error?.message || error);
+      if (
+        error?.code === 'failed-precondition' ||
+        /requires an index/i.test(message)
+      ) {
+        console.error(
+          'Firestore composite index required for sales queries:',
+          message,
+        );
+        throw new Error(
+          'Firestore requires a composite index for this query (sales: createdBy + createdAt).\n' +
+            "Add a composite index for collection 'sales' with fields: createdBy (ASCENDING), createdAt (DESCENDING).\n" +
+            'You can add it in the Firebase Console (Firestore > Indexes) or via firebase.json.\n' +
+            'Example firebase.json snippet:\n' +
+            JSON.stringify(
+              {
+                firestore: {
+                  indexes: [
+                    {
+                      collectionGroup: 'sales',
+                      queryScope: 'COLLECTION',
+                      fields: [
+                        { fieldPath: 'createdBy', order: 'ASCENDING' },
+                        { fieldPath: 'createdAt', order: 'DESCENDING' },
+                      ],
+                    },
+                  ],
+                },
+              },
+              null,
+              2,
+            ),
+        );
+      }
+
       console.error("Error fetching today's sales:", error);
       throw new Error('Failed to fetch sales data');
     }
@@ -123,11 +158,20 @@ class SalesService {
           itemIds.map(id => this.inventoryCollection.doc(id).get()),
         );
 
+        const currentUser = authService ? authService.currentUser : null;
         itemDocs.forEach((doc: any) => {
           const docExists =
             typeof doc.exists === 'function' ? doc.exists() : !!doc.exists;
           if (docExists) {
-            inventoryById[doc.id] = doc.data();
+            const data = doc.data();
+            // Skip inventory items owned by other users
+            if (
+              data?.createdBy &&
+              currentUser &&
+              data.createdBy !== currentUser.uid
+            )
+              return;
+            inventoryById[doc.id] = data;
           }
         });
       }
@@ -135,10 +179,15 @@ class SalesService {
       // Fetch inventory data by SKUs
       const inventoryBySku: Record<string, any> = {};
       if (skus.length > 0) {
+        const currentUser = authService ? authService.currentUser : null;
         const skuQueries = await Promise.all(
-          skus.map(sku =>
-            this.inventoryCollection.where('sku', '==', sku).limit(1).get(),
-          ),
+          skus.map(sku => {
+            let q: any = this.inventoryCollection
+              .where('sku', '==', sku)
+              .limit(1);
+            if (currentUser) q = q.where('createdBy', '==', currentUser.uid);
+            return q.get();
+          }),
         );
 
         skuQueries.forEach((querySnapshot: any) => {
@@ -193,11 +242,14 @@ class SalesService {
     endDate: Date,
   ): Promise<EnrichedSale[]> {
     try {
-      const snapshot = await this.salesCollection
-        .where('createdAt', '>=', firestore.Timestamp.fromDate(startDate))
-        .where('createdAt', '<=', firestore.Timestamp.fromDate(endDate))
-        .orderBy('createdAt', 'desc')
-        .get();
+      const currentUser = authService ? authService.currentUser : null;
+      let query: any = this.salesCollection;
+      if (currentUser) query = query.where('createdBy', '==', currentUser.uid);
+      query = query
+        .where('createdAt', '>=', startDate)
+        .where('createdAt', '<=', endDate)
+        .orderBy('createdAt', 'desc');
+      const snapshot = await query.get();
 
       const rawSales = snapshot.docs.map((doc: any) => ({
         id: doc.id,
@@ -205,7 +257,23 @@ class SalesService {
       }));
 
       return await this.enrichSalesWithProductNames(rawSales);
-    } catch (error) {
+    } catch (error: any) {
+      const message = String(error?.message || error);
+      if (
+        error?.code === 'failed-precondition' ||
+        /requires an index/i.test(message)
+      ) {
+        console.error(
+          'Firestore composite index required for sales date-range queries:',
+          message,
+        );
+        throw new Error(
+          'Firestore requires a composite index for this query (sales: createdBy + createdAt).\n' +
+            "Add a composite index for collection 'sales' with fields: createdBy (ASCENDING), createdAt (DESCENDING).\n" +
+            'You can add it in the Firebase Console (Firestore > Indexes) or via firebase.json.',
+        );
+      }
+
       console.error('Error fetching sales by date range:', error);
       throw new Error('Failed to fetch sales data');
     }
@@ -216,6 +284,12 @@ class SalesService {
    */
   async updateSale(saleId: string, updates: Partial<SaleData>): Promise<void> {
     try {
+      const doc = await this.salesCollection.doc(saleId).get();
+      const owner = doc.exists ? (doc.data() as any)?.createdBy : null;
+      const currentUser = authService ? authService.currentUser : null;
+      if (owner && owner !== currentUser?.uid) {
+        throw new Error('permission-denied');
+      }
       await this.salesCollection.doc(saleId).update(updates);
     } catch (error) {
       console.error('Error updating sale:', error);
@@ -228,6 +302,12 @@ class SalesService {
    */
   async deleteSale(saleId: string): Promise<void> {
     try {
+      const doc = await this.salesCollection.doc(saleId).get();
+      const owner = doc.exists ? (doc.data() as any)?.createdBy : null;
+      const currentUser = authService ? authService.currentUser : null;
+      if (owner && owner !== currentUser?.uid) {
+        throw new Error('permission-denied');
+      }
       await this.salesCollection.doc(saleId).delete();
     } catch (error) {
       console.error('Error deleting sale:', error);

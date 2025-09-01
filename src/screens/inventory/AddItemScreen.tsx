@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -90,6 +91,35 @@ const AddItemScreen = ({ navigation, route }: any) => {
     imageUrl: isEditMode ? editItem.imageUrl || '' : '',
   });
 
+  // Helper to build the initial form state based on route params (edit vs add)
+  const getInitialFormData = useCallback((): FormData => {
+    return {
+      name: isEditMode ? editItem.name : '',
+      description: isEditMode ? editItem.description : '',
+      sku: isEditMode ? editItem.sku : '',
+      category: isEditMode ? editItem.category : '',
+      quantity: isEditMode ? String(editItem.quantity) : '',
+      minStockLevel: isEditMode ? String(editItem.minStockLevel) : '10',
+      maxStockLevel: isEditMode ? String(editItem.maxStockLevel) : '100',
+      unitPrice: isEditMode ? String(editItem.unitPrice) : '',
+      costPrice: isEditMode ? String(editItem.costPrice) : '',
+      supplier: isEditMode ? editItem.supplier || '' : '',
+      supplierPaid:
+        isEditMode && editItem.supplierPaid != null
+          ? String(editItem.supplierPaid)
+          : '',
+      imageUrl: isEditMode ? editItem.imageUrl || '' : '',
+    };
+  }, [editItem, isEditMode]);
+
+  // Reset form when screen gains focus (clears previous values when opening Add screen)
+  useFocusEffect(
+    useCallback(() => {
+      setFormData(getInitialFormData());
+      setErrors({});
+    }, [getInitialFormData]),
+  );
+
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
@@ -172,9 +202,13 @@ const AddItemScreen = ({ navigation, route }: any) => {
 
       let result;
       if (isEditMode) {
-        result = await updateDocument('inventory', editItem.id, itemData);
+        result = await updateDocument('inventory', editItem.id, itemData, {
+          ownerOnly: true,
+        });
       } else {
-        result = await createDocument('inventory', itemData);
+        result = await createDocument('inventory', itemData, {
+          ownerOnly: true,
+        });
       }
 
       if (result.success) {
@@ -349,7 +383,7 @@ const AddItemScreen = ({ navigation, route }: any) => {
           {formData.quantity && (formData.unitPrice || formData.costPrice) && (
             <View style={styles.supplierBox}>
               <Text style={styles.supplierLine}>
-                Supplier Total: $
+                Supplier Total:
                 {(
                   (Number(formData.costPrice) ||
                     Number(formData.unitPrice) ||
@@ -357,10 +391,10 @@ const AddItemScreen = ({ navigation, route }: any) => {
                 ).toFixed(2)}
               </Text>
               <Text style={styles.supplierLine}>
-                Paid: ${Number(formData.supplierPaid || 0).toFixed(2)}
+                Paid: {Number(formData.supplierPaid || 0).toFixed(2)}
               </Text>
               <Text style={styles.supplierDueLine}>
-                Remaining Due: $
+                Remaining Due:
                 {(
                   (Number(formData.costPrice) ||
                     Number(formData.unitPrice) ||

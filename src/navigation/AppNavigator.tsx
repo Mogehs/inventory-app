@@ -18,8 +18,8 @@ import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import InventoryScreen from '../screens/inventory/InventoryScreen';
 import AddItemScreen from '../screens/inventory/AddItemScreen';
 import ItemDetailsScreen from '../screens/inventory/ItemDetailsScreen';
-import SettingsScreen from '../screens/settings/SettingsScreen';
-import HowItWorksScreen from '../screens/settings/HowItWorksScreen';
+// settings screens removed from tabs; keep files in project if needed elsewhere
+import ReportsScreen from '../screens/reports/ReportsScreen';
 import SalesScreen from '../screens/sales/SalesScreen';
 
 const Stack = createStackNavigator();
@@ -118,10 +118,10 @@ const MainTabs = () => (
     />
 
     <Tab.Screen
-      name="Settings"
-      component={SettingsStack}
+      name="Reports"
+      component={ReportsScreen}
       options={{
-        tabBarLabel: 'Settings',
+        tabBarLabel: 'Reports',
         tabBarIcon: SettingsTabIcon,
       }}
     />
@@ -176,40 +176,7 @@ const ItemDetailsWrapper = (props: any) => {
   return <ItemDetailsScreen {...props} />;
 };
 
-const SettingsStack = () => (
-  <Stack.Navigator
-    screenOptions={{
-      headerStyle: {
-        backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 4,
-      },
-      headerTitleStyle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
-      },
-      headerTintColor: '#2563EB',
-    }}
-  >
-    <Stack.Screen
-      name="SettingsList"
-      component={SettingsScreen}
-      options={{ title: 'Settings' }}
-    />
-    <Stack.Screen
-      name="HowItWorks"
-      component={HowItWorksScreen}
-      options={{
-        title: 'How It Works',
-        headerBackTitle: 'Back',
-      }}
-    />
-  </Stack.Navigator>
-);
+// Settings stack removed from bottom tabs; keep screens reachable via other navigation if needed
 
 const AppNavigator = () => {
   const { user, loading } = useAuth();

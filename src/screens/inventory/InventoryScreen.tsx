@@ -187,7 +187,7 @@ const InventoryScreen = ({ navigation, route }: any) => {
 
   const loadInventory = async () => {
     try {
-      const result = await getCollection('inventory');
+      const result = await getCollection('inventory', { ownerOnly: true });
       if (result.success && result.data) {
         setItems(result.data as InventoryItem[]);
       }

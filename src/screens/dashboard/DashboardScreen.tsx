@@ -10,7 +10,6 @@ import {
   TextInput,
   RefreshControl,
 } from 'react-native';
-import firestore from '@react-native-firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { getCollection, updateDocument } from '../../config/firebase';
 import { useToast } from '../../components/ToastProvider';
@@ -67,7 +66,9 @@ const DashboardScreen = ({ navigation }: any) => {
       else setLoading(true);
 
       // Inventory aggregations
-      const inventoryResult = await getCollection('inventory');
+      const inventoryResult = await getCollection('inventory', {
+        ownerOnly: true,
+      });
       const inventory =
         inventoryResult.success && inventoryResult.data
           ? (inventoryResult.data as any[])
@@ -110,7 +111,7 @@ const DashboardScreen = ({ navigation }: any) => {
       });
 
       // Sales aggregations
-      const salesResult = await getCollection('sales');
+      const salesResult = await getCollection('sales', { ownerOnly: true });
       const sales =
         salesResult.success && salesResult.data
           ? (salesResult.data as any[])
@@ -240,7 +241,9 @@ const DashboardScreen = ({ navigation }: any) => {
     setProcessingPayment(true);
     try {
       // fetch all inventory for this supplier
-      const inventoryResult = await getCollection('inventory');
+      const inventoryResult = await getCollection('inventory', {
+        ownerOnly: true,
+      });
       const items =
         inventoryResult.success && inventoryResult.data
           ? (inventoryResult.data as any[])
@@ -315,7 +318,7 @@ const DashboardScreen = ({ navigation }: any) => {
     setProcessingPayment(true);
     try {
       // fetch sales for this customer
-      const salesResult = await getCollection('sales');
+      const salesResult = await getCollection('sales', { ownerOnly: true });
       const sales =
         salesResult.success && salesResult.data
           ? (salesResult.data as any[])
@@ -372,7 +375,7 @@ const DashboardScreen = ({ navigation }: any) => {
           paidAmount: newPaid,
           remainingAmount: newRemaining,
           status: newStatus,
-          updatedAt: firestore.Timestamp.now(),
+          updatedAt: new Date(),
         });
         if (!res.success) {
           toast.showToast(

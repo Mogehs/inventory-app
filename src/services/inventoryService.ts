@@ -1,4 +1,5 @@
 import firestore, { collection } from '@react-native-firebase/firestore';
+import { authService } from '../config/firebase';
 
 export interface InventoryItem {
   id: string;
@@ -20,10 +21,12 @@ class InventoryService {
    */
   async findBySku(sku: string): Promise<InventoryItem | null> {
     try {
-      const querySnapshot = await this.inventoryCollection
+      const currentUser = authService ? authService.currentUser : null;
+      let q: any = this.inventoryCollection
         .where('sku', '==', sku.trim())
-        .limit(1)
-        .get();
+        .limit(1);
+      if (currentUser) q = q.where('createdBy', '==', currentUser.uid);
+      const querySnapshot = await q.get();
 
       if (querySnapshot.empty) {
         return null;
@@ -47,13 +50,22 @@ class InventoryService {
     try {
       const doc = await this.inventoryCollection.doc(itemId).get();
 
-      if (!doc.exists) {
+      const docExists =
+        typeof doc.exists === 'function' ? doc.exists() : !!doc.exists;
+      if (!docExists) return false;
+
+      const data = doc.data();
+      const currentUser = authService ? authService.currentUser : null;
+      // If the document has an owner and it's not the current user, treat as not available
+      if (
+        data?.createdBy &&
+        currentUser &&
+        data.createdBy !== currentUser.uid
+      ) {
         return false;
       }
 
-      const data = doc.data();
       const currentQuantity = Number(data?.quantity || 0);
-
       return currentQuantity >= requiredQuantity;
     } catch (error) {
       console.error('Error checking stock:', error);
@@ -70,6 +82,16 @@ class InventoryService {
 
       const docExists =
         typeof doc.exists === 'function' ? doc.exists() : !!doc.exists;
+      // If the document exists but has an owner and it's not the current user, return null
+      const data = docExists ? (doc.data() as any) : null;
+      const currentUser = authService ? authService.currentUser : null;
+      if (
+        data?.createdBy &&
+        currentUser &&
+        data.createdBy !== currentUser.uid
+      ) {
+        return null;
+      }
       if (!docExists) {
         return null;
       }
@@ -93,20 +115,31 @@ class InventoryService {
 
       await firestore().runTransaction(async transaction => {
         const doc = await transaction.get(itemRef);
-
         const docExists =
           typeof doc.exists === 'function' ? doc.exists() : !!doc.exists;
         if (!docExists) {
           throw new Error('Inventory item not found');
         }
 
-        const currentData = doc.data() as InventoryItem;
+        const currentData = doc.data() as InventoryItem & {
+          createdBy?: string;
+        };
+        const currentUser = authService ? authService.currentUser : null;
+        // Enforce ownership inside the transaction: don't modify items owned by others
+        if (
+          currentData?.createdBy &&
+          currentUser &&
+          currentData.createdBy !== currentUser.uid
+        ) {
+          throw new Error('permission-denied');
+        }
+
         const currentQuantity = currentData.quantity || 0;
         const newQuantity = Math.max(0, currentQuantity + quantityChange);
 
         transaction.update(itemRef, {
           quantity: newQuantity,
-          updatedAt: firestore.Timestamp.now(),
+          updatedAt: new Date(),
         });
       });
     } catch (error) {
@@ -153,10 +186,12 @@ class InventoryService {
    */
   async getLowStockItems(threshold: number = 10): Promise<InventoryItem[]> {
     try {
-      const querySnapshot = await this.inventoryCollection
+      const currentUser = authService ? authService.currentUser : null;
+      let q: any = this.inventoryCollection
         .where('quantity', '<=', threshold)
-        .orderBy('quantity', 'asc')
-        .get();
+        .orderBy('quantity', 'asc');
+      if (currentUser) q = q.where('createdBy', '==', currentUser.uid);
+      const querySnapshot = await q.get();
 
       return querySnapshot.docs.map((doc: any) => ({
         id: doc.id,
@@ -176,15 +211,17 @@ class InventoryService {
       const term = searchTerm.toLowerCase().trim();
 
       // Search by name (contains)
-      const nameQuery = await this.inventoryCollection
+      const currentUser = authService ? authService.currentUser : null;
+      let nameQ: any = this.inventoryCollection
         .where('name', '>=', term)
-        .where('name', '<=', term + '\uf8ff')
-        .get();
-
-      // Search by SKU (exact match)
-      const skuQuery = await this.inventoryCollection
-        .where('sku', '==', term)
-        .get();
+        .where('name', '<=', term + '\uf8ff');
+      let skuQ: any = this.inventoryCollection.where('sku', '==', term);
+      if (currentUser) {
+        nameQ = nameQ.where('createdBy', '==', currentUser.uid);
+        skuQ = skuQ.where('createdBy', '==', currentUser.uid);
+      }
+      const nameQuery = await nameQ.get();
+      const skuQuery = await skuQ.get();
 
       const nameResults = nameQuery.docs.map((doc: any) => ({
         id: doc.id,

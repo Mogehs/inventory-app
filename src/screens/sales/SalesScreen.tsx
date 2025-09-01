@@ -11,9 +11,11 @@ import {
   StatusBar,
   RefreshControl,
 } from 'react-native';
-import { useRoute, useFocusEffect } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
-import firestore, { collection } from '@react-native-firebase/firestore';
+// no direct firestore import required in this screen (services used)
+import { salesService } from '../../services/salesService';
+import { inventoryService } from '../../services/inventoryService';
 import { useToast } from '../../components/ToastProvider';
 import { Sale, ValidationError } from '../../types';
 
@@ -21,11 +23,7 @@ import { Sale, ValidationError } from '../../types';
 // Compact design: removed explicit payment method selector to keep UI tiny and focused
 
 // Enhanced utility functions
-const todayStart = (): Date => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+// helper removed; services provide date-handling where needed
 
 const parseNumber = (v: any): number => {
   const cleaned = String(v).replace(/[^0-9.-]+/g, '');
@@ -1289,45 +1287,62 @@ const SalesScreen: React.FC = () => {
       if (typeof p.name !== 'undefined') setName(p.name || '');
       if (typeof p.unitPrice !== 'undefined')
         setUnitPrice(p.unitPrice ? String(p.unitPrice) : '');
+
+      // Ensure we have inventory info: try fetch by itemId else lookup by SKU
+      (async () => {
+        try {
+          if (p.itemId) {
+            const item = await inventoryService.getById(p.itemId);
+            if (item) {
+              setMatchedSkuName(item.name || null);
+              if (!p.unitPrice && typeof item.unitPrice !== 'undefined')
+                setUnitPrice(String(item.unitPrice));
+              setItemId(item.id);
+            }
+          } else if (p.sku) {
+            const item = await inventoryService.findBySku(p.sku);
+            if (item) {
+              setMatchedSkuName(item.name || null);
+              setItemId(item.id);
+              if (!p.unitPrice && typeof item.unitPrice !== 'undefined')
+                setUnitPrice(String(item.unitPrice));
+            }
+          }
+        } catch (e) {
+          console.error('Prefill inventory lookup failed', e);
+        }
+      })();
     }
-  }, [route.params]);
+  }, [route.params, currentUser]);
 
   // Enhanced SKU lookup with better loading states
-  useEffect(() => {
-    let cancelled = false;
-    setMatchedSkuName(null);
-    setIsLookingUpSku(false);
+  const lookupSku = useCallback(
+    async (skuValue: string) => {
+      const value = (skuValue || '').trim();
+      if (!value) {
+        setMatchedSkuName(null);
+        setItemId('');
+        return;
+      }
 
-    const skuValue = (sku || '').trim();
-    if (!skuValue) {
-      setItemId('');
-      return;
-    }
-
-    setIsLookingUpSku(true);
-    const timeoutId = setTimeout(async () => {
+      let cancelled = false;
+      setIsLookingUpSku(true);
       try {
-        const querySnapshot = await collection(firestore(), 'inventory')
-          .where('sku', '==', skuValue)
-          .limit(2)
-          .get();
+        // small debounce: wait briefly to avoid rapid-fire queries
+        await new Promise<void>(res => setTimeout(() => res(), 250));
 
         if (cancelled) return;
-
-        if (querySnapshot.size === 1) {
-          const doc = querySnapshot.docs[0];
-          const data = doc.data() as any;
-
-          setMatchedSkuName(data.name || null);
-          setItemId(doc.id);
-
-          if (data.name && !name) setName(data.name);
+        const item = await inventoryService.findBySku(value);
+        if (item) {
+          setMatchedSkuName(item.name || null);
+          setItemId(item.id);
+          if (item.name && !name) setName(item.name);
           if (
-            typeof data.unitPrice !== 'undefined' &&
-            data.unitPrice !== null &&
+            typeof item.unitPrice !== 'undefined' &&
+            item.unitPrice !== null &&
             !unitPrice
           ) {
-            setUnitPrice(String(data.unitPrice));
+            setUnitPrice(String(item.unitPrice));
           }
         } else {
           setMatchedSkuName(null);
@@ -1340,13 +1355,35 @@ const SalesScreen: React.FC = () => {
       } finally {
         setIsLookingUpSku(false);
       }
-    }, 500);
+      return () => {
+        cancelled = true;
+      };
+    },
+    [name, unitPrice],
+  );
+
+  // run lookup when SKU changes
+  useEffect(() => {
+    let active = true;
+    setMatchedSkuName(null);
+    setIsLookingUpSku(false);
+
+    const skuValue = (sku || '').trim();
+    if (!skuValue) {
+      setItemId('');
+      return;
+    }
+
+    // call lookup (lookupSku handles its own debounce)
+    (async () => {
+      if (!active) return;
+      await lookupSku(skuValue);
+    })();
 
     return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
+      active = false;
     };
-  }, [sku, name, unitPrice]);
+  }, [sku, lookupSku]);
 
   // Enhanced sales fetching with better error handling
   const fetchTodaySales = useCallback(
@@ -1358,76 +1395,17 @@ const SalesScreen: React.FC = () => {
       }
 
       try {
-        const snapshot = await collection(firestore(), 'sales')
-          .where('createdAt', '>=', firestore.Timestamp.fromDate(todayStart()))
-          .orderBy('createdAt', 'desc')
-          .get();
-
-        const salesData = snapshot.docs.map((doc: any) => ({
-          id: doc.id,
-          ...(doc.data() as any),
-        })) as Sale[];
-
-        // Enrich with inventory data
-        const itemIds = Array.from(
-          new Set(salesData.map(sale => sale.itemId).filter(Boolean)),
-        );
-        const skus = Array.from(
-          new Set(salesData.map(sale => sale.sku).filter(Boolean)),
-        );
-
-        const inventoryById: Record<string, any> = {};
-        const inventoryBySku: Record<string, any> = {};
-
-        // Fetch inventory by IDs
-        if (itemIds.length > 0) {
-          const inventoryDocs = await Promise.all(
-            itemIds.map(id =>
-              collection(firestore(), 'inventory').doc(id).get(),
-            ),
+        // Use salesService which handles owner-scoped queries and enrichment
+        try {
+          const enrichedSales = await salesService.getTodaySales();
+          setSales(enrichedSales as any);
+        } catch (e) {
+          console.warn(
+            'Failed to load today sales (no data or permission):',
+            e,
           );
-
-          inventoryDocs.forEach((docSnap: any) => {
-            if (docSnap.exists()) {
-              inventoryById[docSnap.id] = docSnap.data();
-            }
-          });
+          setSales([]);
         }
-
-        // Fetch inventory by SKUs
-        if (skus.length > 0) {
-          const skuQueries = await Promise.all(
-            skus.map(skuValue =>
-              collection(firestore(), 'inventory')
-                .where('sku', '==', skuValue)
-                .limit(1)
-                .get(),
-            ),
-          );
-
-          skuQueries.forEach((querySnapshot: any) => {
-            if (!querySnapshot.empty) {
-              const doc = querySnapshot.docs[0];
-              const data = doc.data();
-              if (data?.sku) {
-                inventoryBySku[data.sku] = data;
-              }
-            }
-          });
-        }
-
-        // Enrich sales with product names
-        const enrichedSales = salesData.map(sale => ({
-          ...sale,
-          productName:
-            (sale.itemId ? inventoryById[sale.itemId]?.name : undefined) ||
-            (sale.sku ? inventoryBySku[sale.sku]?.name : undefined) ||
-            sale.name ||
-            sale.sku ||
-            'Unknown Product',
-        }));
-
-        setSales(enrichedSales);
       } catch (error) {
         console.error('Error fetching sales:', error);
         toast.showToast('Failed to load sales data', 'error');
@@ -1443,51 +1421,6 @@ const SalesScreen: React.FC = () => {
   useEffect(() => {
     fetchTodaySales();
   }, [fetchTodaySales]);
-
-  useFocusEffect(
-    useCallback(() => {
-      // On focus: always refresh today's sales.
-      // If navigation provided a salePrefill (from ItemDetails), keep SKU/item fields
-      // but reset customer and payment inputs so user can enter a fresh customer each time.
-      const params = (route as any).params || {};
-      const p = params.salePrefill || null;
-
-      if (p) {
-        // Keep product prefill but clear transactional/customer fields
-        setItemId(p.itemId || '');
-        setSku(p.sku || '');
-        setName(p.name || '');
-        setUnitPrice(p.unitPrice ? String(p.unitPrice) : '');
-
-        // Clear per-visit fields
-        setCustomer('');
-        setQuantity('1');
-        setPaidCash('');
-        setPaidOnline('');
-        setTransactionId('');
-        setMatchedSkuName(null); // allow SKU lookup to re-run
-        setFormErrors([]);
-      } else {
-        // No prefill: fully reset form on focus
-        setCustomer('');
-        setItemId('');
-        setSku('');
-        setName('');
-        setUnitPrice('');
-        setQuantity('1');
-        setPaidCash('');
-        setPaidOnline('');
-        setTransactionId('');
-        setMatchedSkuName(null);
-        setFormErrors([]);
-      }
-
-      // Always refresh sales data
-      fetchTodaySales();
-
-      return () => {};
-    }, [fetchTodaySales, route]),
-  );
 
   // Enhanced sale handling with better feedback
   const handleAddSale = async () => {
@@ -1515,7 +1448,7 @@ const SalesScreen: React.FC = () => {
       }
 
       // Build typed object but avoid sending undefined fields to Firestore
-      const now = firestore.Timestamp.now();
+      const now = new Date();
 
       const typed: Partial<Sale> = {
         itemId: itemId || null,
@@ -1558,20 +1491,32 @@ const SalesScreen: React.FC = () => {
       saleData.authorizedBy = currentUser ? currentUser.uid : null;
       saleData.updatedAt = now;
 
-      // Add sale to Firestore
-      await collection(firestore(), 'sales').add(saleData);
+      // Create sale via service (service injects timestamps and ownership)
+      const salePayload = {
+        itemId: itemId || null,
+        sku: sku.trim(),
+        name: name || null,
+        customer: customer.trim(),
+        quantity: quantityNum,
+        unitPrice: unitPriceNum,
+        totalPrice: totalPriceNum,
+        paidCash: parseNumber(paidCash),
+        paidOnline: parseNumber(paidOnline),
+        transactionId: transactionId ? transactionId : undefined,
+        paidAmount: paidTotalNum,
+        remainingAmount: Math.max(0, totalPriceNum - paidTotalNum),
+        status: getSaleStatus(totalPriceNum, paidTotalNum),
+      } as any;
 
-      // Update inventory if itemId exists
+      await salesService.createSale(salePayload);
+
+      // Update inventory via inventoryService which enforces ownership
       if (itemId) {
-        const itemRef = collection(firestore(), 'inventory').doc(itemId);
-        await firestore().runTransaction(async transaction => {
-          const itemDoc = await transaction.get(itemRef);
-          if (itemDoc.exists()) {
-            const currentQuantity = itemDoc.data()?.quantity || 0;
-            const newQuantity = Math.max(0, currentQuantity - quantityNum);
-            transaction.update(itemRef, { quantity: newQuantity });
-          }
-        });
+        try {
+          await inventoryService.decreaseQuantity(itemId, quantityNum);
+        } catch (e) {
+          console.warn('Inventory decrease skipped or failed:', e);
+        }
       }
 
       // Reset form

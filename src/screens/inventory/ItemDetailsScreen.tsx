@@ -186,7 +186,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
       const newQuantity = currentItem.quantity - quantity;
       await firestore().collection('inventory').doc(currentItem.id).update({
         quantity: newQuantity,
-        updatedAt: firestore.Timestamp.now(),
+        updatedAt: new Date(),
       });
 
       Alert.alert('Success', `Sold ${quantity} units successfully`);
@@ -209,7 +209,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ route }) => {
       const newQuantity = currentItem.quantity + quantity;
       await firestore().collection('inventory').doc(currentItem.id).update({
         quantity: newQuantity,
-        updatedAt: firestore.Timestamp.now(),
+        updatedAt: new Date(),
       });
 
       // Show success modal instead of basic alert

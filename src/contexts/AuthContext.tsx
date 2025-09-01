@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { authService } from '../config/firebase';
+import { authService, db } from '../config/firebase';
 
 interface AuthContextType {
   user: any | null;
@@ -38,6 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const signIn = async (email: string, password: string) => {
     try {
       await authService.signInWithEmailAndPassword(email, password);
+      // ensure context user reflects the signed-in user immediately
+      setUser(authService.currentUser);
     } catch (error) {
       console.error('Sign in error:', error);
       throw error;
@@ -51,6 +53,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         password,
       );
       await userCredential.user.updateProfile({ displayName: name });
+      // update context immediately so UI shows the correct name after sign up
+      setUser(authService.currentUser ?? userCredential.user);
+
+      // create a lightweight user document so other parts can read profile info
+      try {
+        await db.collection('users').doc(userCredential.user.uid).set({
+          uid: userCredential.user.uid,
+          displayName: name,
+          email: userCredential.user.email,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        // non-fatal: user doc creation failed
+        console.debug('Could not create user document:', e);
+      }
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;
